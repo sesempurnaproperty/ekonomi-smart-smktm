@@ -21,6 +21,15 @@ Pengguna mengisi username dan password. Sistem menyemak role daripada `public.us
 
 Role tidak dipilih pada halaman login dan pengguna tidak boleh menukar role sendiri. Setiap dashboard menyemak semula profil di server sebelum memaparkan kandungan.
 
+## Pengurusan kelas
+
+- `public.academic_classes` ialah katalog kelas Tingkatan 4 dan Tingkatan 5.
+- Setiap profil murid dipautkan kepada kelas melalui `academic_class_id`.
+- Nama kelas boleh dikemaskini; fungsi database mengekalkan kemas kini nama pada semua profil murid dalam satu transaksi.
+- Murid boleh dipindahkan ke kelas aktif lain oleh pentadbir.
+- Kelas hanya boleh dipadam apabila tiada murid lagi dipautkan.
+- Senarai kelas boleh dicetak atau dieksport sebagai CSV tanpa sebarang password.
+
 ## Profil dan keselamatan
 
 - `public.user_profiles` ialah jadual pusat profil dan role.
