@@ -116,3 +116,26 @@
   .markSettingsGrid, .markImportBox, .noPrint { display: none !important; }
   .markPanel { border: 0; box-shadow: none; }
 }
+
+
+.classLevel {
+  color: #168063;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .14em;
+}
+.classBack {
+  padding: 9px 12px;
+  border: 1px solid #dfe7e1;
+  border-radius: 5px;
+  color: #466a5c;
+  font-size: 8px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.markClassNameHeader {
+  margin: 6px 0 0;
+  color: #173a31;
+  font-size: 19px;
+  letter-spacing: -.04em;
+}
