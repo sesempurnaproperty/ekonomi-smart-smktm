@@ -194,7 +194,7 @@ export default function AnalyticsDashboard() {
         <>
           <div className={styles.kpiGrid}>
             <article className={styles.kpiCard}><span className={styles.kpiLabel}>Murid aktif dalam pilihan</span><strong className={styles.kpiValue}>{currentSummary.total}</strong><span className={styles.kpiHint}>Murid aktif mengikut penapis tingkatan dan kelas</span></article>
-            <article className={styles.kpiCard}><span className={styles.kpiLabel}>Purata markah</span><strong className={styles.kpiValue}>{fmt(currentSummary.average)}</strong><span className={styles.kpiHint}>Daripada {currentSummary.numeric} markah angka; TH/X tidak dimasukkan</span></article>
+            <article className={styles.kpiCard}><span className={styles.kpiLabel}>Purata markah</span><strong className={styles.kpiValue}>{fmt(currentSummary.average)}</strong><span className={styles.kpiHint}>Median {fmt(currentSummary.median)} · Tertinggi {fmt(currentSummary.highest, 0)} · Terendah {fmt(currentSummary.lowest, 0)}</span></article>
             <article className={styles.kpiCard}><span className={styles.kpiLabel}>Kadar lulus</span><strong className={styles.kpiValue}>{currentSummary.passRate === null ? "—" : fmt(currentSummary.passRate) + "%"}</strong><span className={styles.kpiHint}>{currentSummary.pass} lulus · {currentSummary.fail} belum mencapai 40 markah</span></article>
             <article className={styles.kpiCard}><span className={styles.kpiLabel}>Liputan rekod</span><strong className={styles.kpiValue}>{currentSummary.coverage === null ? "—" : fmt(currentSummary.coverage) + "%"}</strong><span className={styles.kpiHint}>{currentSummary.recorded} rekod · {currentSummary.missing} belum direkodkan</span></article>
           </div>
@@ -238,6 +238,18 @@ export default function AnalyticsDashboard() {
               <div className={styles.insightCard}><span className={styles.insightLabel}>MURID MEROSOT</span><strong className={styles.insightValue}>{declined} orang</strong></div>
             </div>
             <div className={styles.tableScroll} style={{ marginTop: 14 }}>
+              <table className={styles.analyticsTable}>
+                <thead><tr><th>TINGKATAN</th><th>PURATA PPT</th><th>PURATA PAT</th><th>PERUBAHAN</th><th>MENINGKAT</th><th>MEROSOT</th><th>BERPASANGAN</th></tr></thead>
+                <tbody>{formSummaries.map(({ level, students: group }) => {
+                  const entries = group.map(getProgress).filter((entry) => entry.delta !== null);
+                  const pptAvg = entries.length ? entries.reduce((sum, entry) => sum + (entry.ppt ?? 0), 0) / entries.length : null;
+                  const patAvg = entries.length ? entries.reduce((sum, entry) => sum + (entry.pat ?? 0), 0) / entries.length : null;
+                  const delta = pptAvg !== null && patAvg !== null ? patAvg - pptAvg : null;
+                  return <tr key={level}><td className={styles.studentName}>Tingkatan {level}</td><td className={styles.numeric}>{fmt(pptAvg)}</td><td className={styles.numeric}>{fmt(patAvg)}</td><td className={delta === null ? styles.numeric : delta > 0 ? `${styles.numeric} ${styles.changePositive}` : delta < 0 ? `${styles.numeric} ${styles.changeNegative}` : styles.numeric}>{delta === null ? "—" : (delta > 0 ? "+" : "") + fmt(delta)}</td><td className={styles.numeric}>{entries.filter((entry) => (entry.delta ?? 0) > 0).length}</td><td className={styles.numeric}>{entries.filter((entry) => (entry.delta ?? 0) < 0).length}</td><td className={styles.numeric}>{entries.length}/{group.length}</td></tr>;
+                })}</tbody>
+              </table>
+            </div>
+            <p className={styles.sectionNote} style={{ marginTop: 14, marginBottom: 8 }}>Perkembangan mengikut kelas</p>
               <table className={styles.analyticsTable}><thead><tr><th>KELAS</th><th>PURATA PPT</th><th>PURATA PAT</th><th>PERUBAHAN</th><th>MENINGKAT</th><th>MEROSOT</th><th>BERPASANGAN</th></tr></thead>
                 <tbody>{classSummaries.map(({ item, group }) => {
                   const entries = group.map(getProgress).filter((entry) => entry.delta !== null);
