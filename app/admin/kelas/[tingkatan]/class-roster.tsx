@@ -200,6 +200,25 @@ export default function ClassRoster({
     URL.revokeObjectURL(url);
   }
 
+  async function exportExcel() {
+    const XLSX = await import("@keep-lts/xlsx");
+    const records = filtered.map((student, index) => ({
+      "Bil": index + 1,
+      "Nama Penuh": student.full_name,
+      "Username": student.username,
+      "Tingkatan": student.form_level,
+      "Kelas": student.class_name,
+      "Status Akaun": student.is_active ? "Aktif" : "Tidak aktif"
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(records);
+    worksheet["!cols"] = [
+      { wch: 7 }, { wch: 42 }, { wch: 30 }, { wch: 12 }, { wch: 18 }, { wch: 18 }
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, `T${formLevel} ${className}`.slice(0, 31));
+    XLSX.writeFile(workbook, `Senarai_${formLevel}_${className.replace(/\\s+/g, "_")}.xlsx`);
+  }
+
   return (
     <section className={styles.rosterPanel}>
       <div className={styles.classManagementPanel}>
@@ -235,6 +254,7 @@ export default function ClassRoster({
           <input className={styles.rosterSearch} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama atau username murid..." aria-label="Cari nama atau username murid"/>
           <button className={styles.classActionButton} type="button" onClick={() => window.print()}>CETAK SENARAI</button>
           <button className={styles.classActionButton} type="button" onClick={exportCsv}>EKSPORT CSV</button>
+          <button className={styles.classActionButton} type="button" onClick={() => void exportExcel()}>EKSPORT EXCEL</button>
         </div>
       </div>
 
