@@ -51,7 +51,8 @@ Buka http://localhost:3000.
 - [x] Jadual pusat user_profiles dengan role admin, teacher dan student
 - [x] Login tunggal berasaskan username + password
 - [x] Dashboard berasingan dengan semakan role di server
-- [ ] Pengurusan akaun guru dan murid melalui dashboard admin
+- [x] Pengurusan akaun individu guru/murid melalui dashboard admin
+- [ ] Import pukal 61 akaun murid (Excel/CSV)
 - [ ] Import pukal 61 akaun murid
 - [ ] Modul pembelajaran Tingkatan 4 dan Tingkatan 5
 - [ ] Nota, video, latihan, kuiz dan analisis pencapaian
