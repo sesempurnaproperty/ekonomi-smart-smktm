@@ -377,6 +377,13 @@ export default function ClassMarksManager({
 
   return (
     <>
+      <div className={styles.markPanelHeader}>
+        <div>
+          <span className={styles.classLevel}>TINGKATAN {formLevel} · REKOD KELAS</span>
+          <h2 className={styles.markClassNameHeader}>{className}</h2>
+        </div>
+        <span className={styles.classLevel}>{students.length} MURID</span>
+      </div>
       <div className={styles.markSummary}>
         <div className={styles.markSummaryCard}><strong>{students.length}</strong><span>JUMLAH MURID</span></div>
         <div className={styles.markSummaryCard}><strong>{submittedCounts.PPT2026}/{students.length}</strong><span>PPT2026 DIREKOD</span></div>
