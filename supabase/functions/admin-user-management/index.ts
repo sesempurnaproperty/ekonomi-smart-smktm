@@ -146,6 +146,87 @@ Deno.serve(async (req: Request) => {
       return response({ users: rows }, 200, origin);
     }
 
+
+    if (action === "list_classes") {
+      const rows = await getProfileRows(supabaseUrl, secretKey, {
+        select: "user_id,form_level,class_name,is_active",
+        role: "eq.student",
+        order: "form_level.asc,class_name.asc",
+        limit: "1000"
+      });
+
+      const grouped = new Map<string, {
+        form_level: number;
+        class_name: string;
+        total_students: number;
+        active_students: number;
+        inactive_students: number;
+      }>();
+
+      for (const row of (Array.isArray(rows) ? rows : [])) {
+        const formLevel = Number(row.form_level);
+        const className = typeof row.class_name === "string" ? row.class_name.trim() : "";
+        if (![4, 5].includes(formLevel) || !className) continue;
+
+        const key = formLevel + "::" + className.toLowerCase();
+        const current = grouped.get(key) ?? {
+          form_level: formLevel,
+          class_name: className,
+          total_students: 0,
+          active_students: 0,
+          inactive_students: 0
+        };
+
+        current.total_students += 1;
+        if (row.is_active === true) current.active_students += 1;
+        else current.inactive_students += 1;
+        grouped.set(key, current);
+      }
+
+      const classes = Array.from(grouped.values()).sort((a, b) =>
+        a.form_level - b.form_level ||
+        a.class_name.localeCompare(b.class_name, "ms")
+      );
+
+      return response({
+        classes,
+        total_classes: classes.length,
+        total_students: classes.reduce((sum, item) => sum + item.total_students, 0),
+        active_students: classes.reduce((sum, item) => sum + item.active_students, 0)
+      }, 200, origin);
+    }
+
+    if (action === "list_class_students") {
+      const formLevel = Number(body.form_level);
+      const className = typeof body.class_name === "string" ? body.class_name.trim() : "";
+
+      if (![4, 5].includes(formLevel) || className.length < 1 || className.length > 60) {
+        return response({ error: "Tingkatan atau nama kelas tidak sah." }, 400, origin);
+      }
+
+      const rows = await getProfileRows(supabaseUrl, secretKey, {
+        select: "user_id,username,full_name,form_level,class_name,is_active,created_at",
+        role: "eq.student",
+        form_level: "eq." + formLevel,
+        class_name: "eq." + className,
+        order: "full_name.asc",
+        limit: "500"
+      });
+
+      return response({
+        form_level: formLevel,
+        class_name: className,
+        students: (Array.isArray(rows) ? rows : []).map((row) => ({
+          user_id: row.user_id,
+          username: row.username,
+          full_name: row.full_name,
+          form_level: row.form_level,
+          class_name: row.class_name,
+          is_active: row.is_active
+        }))
+      }, 200, origin);
+    }
+
     if (action === "create") {
       const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
       const fullName = typeof body.full_name === "string" ? body.full_name.trim() : "";
