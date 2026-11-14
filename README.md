@@ -32,7 +32,18 @@ Role tidak dipilih pada halaman login dan pengguna tidak boleh menukar role send
 
 ## Import murid
 
-Modul import pukal akan menyokong batch pertama seramai 61 murid. Username dan password ditentukan serta dibekalkan oleh pentadbir, kemudian sistem mencipta akaun Auth dan profil role `student`.
+Modul import pukal menyokong fail `.xlsx`, `.xls` dan `.csv` sehingga 100 rekod setiap batch (template awal menyediakan 61 baris).
+
+Lajur wajib:
+- `Nama Penuh`
+- `Username`
+- `Password`
+- `Tingkatan` (4 atau 5)
+- `Kelas`
+
+Pentadbir menetapkan semua username dan password. Password minimum 8 aksara, dihantar terus kepada Supabase Auth ketika pendaftaran dan tidak disimpan dalam `user_profiles`. Sistem menyemak format medan, username berulang, dan username yang sudah wujud. Laporan import menunjukkan keputusan bagi setiap baris tanpa memaparkan password.
+
+Template boleh dimuat turun dari Dashboard Pentadbir > Pengurusan Pengguna.
 
 ## Pembangunan setempat
 
@@ -52,8 +63,7 @@ Buka http://localhost:3000.
 - [x] Login tunggal berasaskan username + password
 - [x] Dashboard berasingan dengan semakan role di server
 - [x] Pengurusan akaun individu guru/murid melalui dashboard admin
-- [ ] Import pukal 61 akaun murid (Excel/CSV)
-- [ ] Import pukal 61 akaun murid
+- [x] Import pukal murid Excel/CSV dengan pratonton dan laporan baris
 - [ ] Modul pembelajaran Tingkatan 4 dan Tingkatan 5
 - [ ] Nota, video, latihan, kuiz dan analisis pencapaian
 - [ ] Penjana soalan menggunakan AI
