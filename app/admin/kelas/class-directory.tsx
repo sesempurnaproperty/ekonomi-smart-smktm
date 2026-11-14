@@ -105,7 +105,7 @@ export default function ClassDirectory() {
         <>
           {formFour.length > 0 ? (
             <section>
-              <div className="section-kicker">TINGKATAN 4</div>
+              <div className={styles.classLevel}>TINGKATAN 4</div>
               <div className={styles.classGrid}>
                 {formFour.map((item) => (
                   <Link
@@ -137,7 +137,7 @@ export default function ClassDirectory() {
 
           {formFive.length > 0 ? (
             <section style={{ marginTop: formFour.length > 0 ? 38 : 0 }}>
-              <div className="section-kicker">TINGKATAN 5</div>
+              <div className={styles.classLevel}>TINGKATAN 5</div>
               <div className={styles.classGrid}>
                 {formFive.map((item) => (
                   <Link
