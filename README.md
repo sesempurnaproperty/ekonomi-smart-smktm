@@ -21,6 +21,16 @@ Pengguna mengisi username dan password. Sistem menyemak role daripada `public.us
 
 Role tidak dipilih pada halaman login dan pengguna tidak boleh menukar role sendiri. Setiap dashboard menyemak semula profil di server sebelum memaparkan kandungan.
 
+## Rekod markah
+
+- Katalog pentaksiran menyimpan `PPT2026` dan `PAT2026` serta had markah maksimum yang boleh dilaras oleh pentadbir.
+- `student_assessment_marks` menyimpan satu rekod bagi setiap murid dan pentaksiran.
+- Rekod markah dipautkan kepada `user_profiles.user_id`, jadi ia kekal bersama murid walaupun murid berpindah kelas.
+- Pentadbir boleh mengemas kini markah secara individu atau import fail Excel/CSV mengikut kelas.
+- Markah mestilah antara sifar dan had maksimum yang ditetapkan.
+- Lajur kosong dalam import pukal mengekalkan markah sedia ada. Medan kosong dalam kemas kini individu mengosongkan rekod peperiksaan itu.
+- Fail import markah tidak mengandungi password.
+
 ## Pengurusan kelas
 
 - `public.academic_classes` ialah katalog kelas Tingkatan 4 dan Tingkatan 5.
