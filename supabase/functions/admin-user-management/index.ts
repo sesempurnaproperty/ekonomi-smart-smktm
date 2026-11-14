@@ -178,16 +178,58 @@ Deno.serve(async (req: Request) => {
 
     // Authorization is checked from the protected database profile, never from user metadata.
     const callerRows = await getProfileRows(supabaseUrl, secretKey, {
-      select: "user_id,role,is_active",
+      select: "user_id,username,full_name,role,form_level,class_name,academic_class_id,is_active",
       user_id: `eq.${callerId}`,
       limit: "1"
     });
     const callerProfile = Array.isArray(callerRows) ? callerRows[0] : null;
+    const action = typeof body.action === "string" ? body.action : "";
+
+    // Murid hanya boleh meminta rekod yang dimiliki oleh ID daripada token sesi sendiri.
+    // Tiada user_id daripada request body digunakan dalam carian ini.
+    if (action === "student_performance") {
+      if (!callerProfile || callerProfile.role !== "student" || callerProfile.is_active !== true) {
+        return response({ error: "Akses ditolak. Akaun murid aktif diperlukan." }, 403, origin);
+      }
+
+      const [markRows, assessmentRows] = await Promise.all([
+        getTableRows(supabaseUrl, secretKey, "student_assessment_marks", {
+          select: "assessment_code,score,mark_status,updated_at",
+          student_id: "eq." + callerId,
+          limit: "100"
+        }),
+        getTableRows(supabaseUrl, secretKey, "assessment_catalog", {
+          select: "code,title,max_score,is_active",
+          order: "code.asc",
+          limit: "100"
+        })
+      ]);
+
+      const marks = Array.isArray(markRows) ? markRows : [];
+      const assessments = Array.isArray(assessmentRows) ? assessmentRows : [];
+      const lastUpdated = marks.reduce((latest: string | null, mark: Record<string, unknown>) => {
+        const updatedAt = typeof mark.updated_at === "string" ? mark.updated_at : null;
+        return updatedAt && (!latest || updatedAt > latest) ? updatedAt : latest;
+      }, null);
+
+      return response({
+        student: {
+          user_id: callerProfile.user_id,
+          full_name: callerProfile.full_name,
+          form_level: callerProfile.form_level,
+          class_name: callerProfile.class_name
+        },
+        marks,
+        assessments,
+        last_updated: lastUpdated,
+        generated_at: new Date().toISOString()
+      }, 200, origin);
+    }
+
+    // Semua tindakan lain kekal eksklusif untuk akaun pentadbir aktif.
     if (!callerProfile || callerProfile.role !== "admin" || callerProfile.is_active !== true) {
       return response({ error: "Akses ditolak. Hanya pentadbir boleh mengurus akaun." }, 403, origin);
     }
-
-    const action = typeof body.action === "string" ? body.action : "";
 
     if (action === "list") {
       const rows = await getProfileRows(supabaseUrl, secretKey, {
