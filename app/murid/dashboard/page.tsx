@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getCurrentProfile } from "../../../lib/auth/get-current-profile";
 import styles from "../../guru/guru.module.css";
 import TeacherLogoutButton from "../../guru/dashboard/logout-button";
+import StudentPerformance from "./student-performance";
 
 export const metadata: Metadata = {
   title: "Dashboard Murid | Ekonomi Smart SMKTM",
@@ -42,6 +43,8 @@ export default async function StudentDashboardPage() {
           {profile.class_name ? ` · ${profile.class_name}` : ""} 
           {" "}— ruang pembelajaran anda sedang disediakan.
         </p>
+
+        <StudentPerformance />
 
         <div className={styles.dashboardGrid}>
           {[
