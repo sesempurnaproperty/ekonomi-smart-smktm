@@ -23,6 +23,8 @@ type RequestBody = {
   class_name?: unknown;
   user_id?: unknown;
   is_active?: unknown;
+  class_id?: unknown;
+  new_class_name?: unknown;
   rows?: unknown;
 };
 
@@ -75,6 +77,20 @@ async function getProfileRows(
     headers: { apikey: secretKey, Accept: "application/json" }
   });
   if (!res.ok) throw new Error(`Profile query failed: ${res.status}`);
+  return await res.json();
+}
+
+async function getClassRows(
+  supabaseUrl: string,
+  secretKey: string,
+  query: Record<string, string>
+) {
+  const url = new URL("/rest/v1/academic_classes", supabaseUrl);
+  for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
+  const res = await fetch(url, {
+    headers: { apikey: secretKey, Accept: "application/json" }
+  });
+  if (!res.ok) throw new Error(`Class query failed: ${res.status}`);
   return await res.json();
 }
 
@@ -148,45 +164,41 @@ Deno.serve(async (req: Request) => {
 
 
     if (action === "list_classes") {
-      const rows = await getProfileRows(supabaseUrl, secretKey, {
-        select: "user_id,form_level,class_name,is_active",
-        role: "eq.student",
-        order: "form_level.asc,class_name.asc",
-        limit: "1000"
-      });
+      const [classRows, studentRows] = await Promise.all([
+        getClassRows(supabaseUrl, secretKey, {
+          select: "id,form_level,class_name,is_active,created_at",
+          order: "form_level.asc,class_name.asc",
+          limit: "200"
+        }),
+        getProfileRows(supabaseUrl, secretKey, {
+          select: "academic_class_id,is_active",
+          role: "eq.student",
+          limit: "1000"
+        })
+      ]);
 
-      const grouped = new Map<string, {
-        form_level: number;
-        class_name: string;
-        total_students: number;
-        active_students: number;
-        inactive_students: number;
-      }>();
-
-      for (const row of (Array.isArray(rows) ? rows : [])) {
-        const formLevel = Number(row.form_level);
-        const className = typeof row.class_name === "string" ? row.class_name.trim() : "";
-        if (![4, 5].includes(formLevel) || !className) continue;
-
-        const key = formLevel + "::" + className.toLowerCase();
-        const current = grouped.get(key) ?? {
-          form_level: formLevel,
-          class_name: className,
-          total_students: 0,
-          active_students: 0,
-          inactive_students: 0
-        };
-
-        current.total_students += 1;
-        if (row.is_active === true) current.active_students += 1;
-        else current.inactive_students += 1;
-        grouped.set(key, current);
+      const counts = new Map<string, { total: number; active: number; inactive: number }>();
+      for (const student of (Array.isArray(studentRows) ? studentRows : [])) {
+        if (typeof student.academic_class_id !== "string") continue;
+        const current = counts.get(student.academic_class_id) ?? { total: 0, active: 0, inactive: 0 };
+        current.total += 1;
+        if (student.is_active === true) current.active += 1;
+        else current.inactive += 1;
+        counts.set(student.academic_class_id, current);
       }
 
-      const classes = Array.from(grouped.values()).sort((a, b) =>
-        a.form_level - b.form_level ||
-        a.class_name.localeCompare(b.class_name, "ms")
-      );
+      const classes = (Array.isArray(classRows) ? classRows : []).map((item) => {
+        const count = counts.get(item.id) ?? { total: 0, active: 0, inactive: 0 };
+        return {
+          id: item.id,
+          form_level: item.form_level,
+          class_name: item.class_name,
+          is_active: item.is_active,
+          total_students: count.total,
+          active_students: count.active,
+          inactive_students: count.inactive
+        };
+      });
 
       return response({
         classes,
@@ -197,34 +209,171 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "list_class_students") {
-      const formLevel = Number(body.form_level);
-      const className = typeof body.class_name === "string" ? body.class_name.trim() : "";
-
-      if (![4, 5].includes(formLevel) || className.length < 1 || className.length > 60) {
-        return response({ error: "Tingkatan atau nama kelas tidak sah." }, 400, origin);
+      const classId = typeof body.class_id === "string" ? body.class_id : "";
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(classId)) {
+        return response({ error: "ID kelas tidak sah." }, 400, origin);
       }
 
+      const classRows = await getClassRows(supabaseUrl, secretKey, {
+        select: "id,form_level,class_name,is_active",
+        id: "eq." + classId,
+        limit: "1"
+      });
+      const selectedClass = Array.isArray(classRows) ? classRows[0] : null;
+      if (!selectedClass) return response({ error: "Kelas tidak ditemui." }, 404, origin);
+
       const rows = await getProfileRows(supabaseUrl, secretKey, {
-        select: "user_id,username,full_name,form_level,class_name,is_active,created_at",
+        select: "user_id,username,full_name,form_level,class_name,is_active,academic_class_id",
         role: "eq.student",
-        form_level: "eq." + formLevel,
-        class_name: "eq." + className,
+        academic_class_id: "eq." + classId,
         order: "full_name.asc",
         limit: "500"
       });
 
       return response({
-        form_level: formLevel,
-        class_name: className,
+        class: selectedClass,
         students: (Array.isArray(rows) ? rows : []).map((row) => ({
           user_id: row.user_id,
           username: row.username,
           full_name: row.full_name,
           form_level: row.form_level,
           class_name: row.class_name,
+          academic_class_id: row.academic_class_id,
           is_active: row.is_active
         }))
       }, 200, origin);
+    }
+
+    if (action === "create_class") {
+      const formLevel = Number(body.form_level);
+      const className = typeof body.class_name === "string" ? body.class_name.trim() : "";
+      if (![4, 5].includes(formLevel) || className.length < 1 || className.length > 60) {
+        return response({ error: "Tingkatan atau nama kelas tidak sah." }, 400, origin);
+      }
+      const existing = await getClassRows(supabaseUrl, secretKey, {
+        select: "id,class_name",
+        form_level: "eq." + formLevel,
+        limit: "200"
+      });
+      if ((Array.isArray(existing) ? existing : []).some((item) => String(item.class_name ?? "").toLowerCase() === className.toLowerCase())) {
+        return response({ error: "Nama kelas tersebut sudah wujud untuk tingkatan ini." }, 409, origin);
+      }
+      const created = await fetch(new URL("/rest/v1/academic_classes", supabaseUrl), {
+        method: "POST",
+        headers: { apikey: secretKey, "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify({ form_level: formLevel, class_name: className, is_active: true })
+      });
+      const rows = await created.json().catch(() => []);
+      if (!created.ok) return response({ error: "Kelas gagal dicipta. Semak sama ada nama kelas telah digunakan." }, 502, origin);
+      const item = Array.isArray(rows) ? rows[0] : null;
+      return response({ message: "Kelas berjaya dicipta.", class: item }, 201, origin);
+    }
+
+    if (action === "rename_class") {
+      const classId = typeof body.class_id === "string" ? body.class_id : "";
+      const newName = typeof body.new_class_name === "string" ? body.new_class_name.trim() : "";
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(classId) ||
+          newName.length < 1 || newName.length > 60) {
+        return response({ error: "ID atau nama kelas tidak sah." }, 400, origin);
+      }
+      const renamed = await fetch(new URL("/rest/v1/rpc/admin_rename_academic_class", supabaseUrl), {
+        method: "POST",
+        headers: { apikey: secretKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_class_id: classId, p_new_class_name: newName })
+      });
+      const result = await renamed.json().catch(() => null);
+      if (!renamed.ok || result !== true) {
+        const detail = typeof result === "string" ? result : "";
+        return response({ error: detail || "Nama kelas gagal dikemaskini." }, 409, origin);
+      }
+      return response({ message: "Nama kelas dan rekod murid berjaya dikemaskini." }, 200, origin);
+    }
+
+    if (action === "set_class_status") {
+      const classId = typeof body.class_id === "string" ? body.class_id : "";
+      const isActive = body.is_active;
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(classId) ||
+          typeof isActive !== "boolean") {
+        return response({ error: "Permintaan status kelas tidak sah." }, 400, origin);
+      }
+      const url = new URL("/rest/v1/academic_classes", supabaseUrl);
+      url.searchParams.set("id", "eq." + classId);
+      const update = await fetch(url, {
+        method: "PATCH",
+        headers: { apikey: secretKey, "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify({ is_active: isActive, updated_at: new Date().toISOString() })
+      });
+      const updatedRows = await update.json().catch(() => []);
+      if (!update.ok || !Array.isArray(updatedRows) || updatedRows.length === 0) {
+        return response({ error: "Status kelas gagal dikemaskini." }, 502, origin);
+      }
+      return response({ message: "Status kelas berjaya dikemaskini." }, 200, origin);
+    }
+
+    if (action === "delete_class") {
+      const classId = typeof body.class_id === "string" ? body.class_id : "";
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(classId)) {
+        return response({ error: "ID kelas tidak sah." }, 400, origin);
+      }
+      const assigned = await getProfileRows(supabaseUrl, secretKey, {
+        select: "user_id",
+        role: "eq.student",
+        academic_class_id: "eq." + classId,
+        limit: "1"
+      });
+      if (Array.isArray(assigned) && assigned.length > 0) {
+        return response({ error: "Kelas masih mempunyai murid. Pindahkan semua murid sebelum kelas boleh dipadam." }, 409, origin);
+      }
+      const url = new URL("/rest/v1/academic_classes", supabaseUrl);
+      url.searchParams.set("id", "eq." + classId);
+      const deleted = await fetch(url, {
+        method: "DELETE",
+        headers: { apikey: secretKey, Prefer: "return=representation" }
+      });
+      if (!deleted.ok) return response({ error: "Kelas gagal dipadam." }, 502, origin);
+      return response({ message: "Kelas kosong berjaya dipadam." }, 200, origin);
+    }
+
+    if (action === "transfer_student") {
+      const userId = typeof body.user_id === "string" ? body.user_id : "";
+      const classId = typeof body.class_id === "string" ? body.class_id : "";
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidPattern.test(userId) || !uuidPattern.test(classId)) {
+        return response({ error: "ID murid atau kelas tidak sah." }, 400, origin);
+      }
+      const [profileRows, classRows] = await Promise.all([
+        getProfileRows(supabaseUrl, secretKey, {
+          select: "user_id,role",
+          user_id: "eq." + userId,
+          limit: "1"
+        }),
+        getClassRows(supabaseUrl, secretKey, {
+          select: "id,form_level,class_name,is_active",
+          id: "eq." + classId,
+          limit: "1"
+        })
+      ]);
+      const student = Array.isArray(profileRows) ? profileRows[0] : null;
+      const targetClass = Array.isArray(classRows) ? classRows[0] : null;
+      if (!student || student.role !== "student") return response({ error: "Rekod murid tidak ditemui." }, 404, origin);
+      if (!targetClass || targetClass.is_active !== true) return response({ error: "Kelas sasaran tidak aktif atau tidak ditemui." }, 404, origin);
+      const url = new URL("/rest/v1/user_profiles", supabaseUrl);
+      url.searchParams.set("user_id", "eq." + userId);
+      const updated = await fetch(url, {
+        method: "PATCH",
+        headers: { apikey: secretKey, "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify({
+          academic_class_id: classId,
+          form_level: targetClass.form_level,
+          class_name: targetClass.class_name,
+          updated_at: new Date().toISOString()
+        })
+      });
+      const updatedRows = await updated.json().catch(() => []);
+      if (!updated.ok || !Array.isArray(updatedRows) || updatedRows.length === 0) {
+        return response({ error: "Murid gagal dipindahkan. Rekod asal dikekalkan." }, 502, origin);
+      }
+      return response({ message: "Murid berjaya dipindahkan ke kelas baharu." }, 200, origin);
     }
 
     if (action === "create") {
@@ -257,6 +406,23 @@ Deno.serve(async (req: Request) => {
 
       // Plain usernames receive a non-deliverable internal Auth email address.
       // Email-style usernames (for example DELIMa) remain their own Auth email.
+      let academicClassId: string | null = null;
+      if (role === "student") {
+        const classRows = await getClassRows(supabaseUrl, secretKey, {
+          select: "id,form_level,class_name,is_active",
+          form_level: "eq." + formLevel,
+          is_active: "eq.true",
+          limit: "200"
+        });
+        const selectedClass = (Array.isArray(classRows) ? classRows : []).find(
+          (item) => String(item.class_name ?? "").toLowerCase() === className.toLowerCase()
+        );
+        if (!selectedClass) {
+          return response({ error: "Pilih kelas aktif yang telah didaftarkan dalam Modul Pengurusan Kelas." }, 400, origin);
+        }
+        academicClassId = selectedClass.id;
+      }
+
       const authEmail = username.includes("@")
         ? username
         : `${username}@accounts.ekonomismart.invalid`;
@@ -297,6 +463,7 @@ Deno.serve(async (req: Request) => {
         role: role as ProfileRole,
         form_level: role === "student" ? formLevel : null,
         class_name: role === "student" ? className : null,
+        academic_class_id: role === "student" ? academicClassId : null,
         is_active: true
       };
 
@@ -403,6 +570,20 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
+        const classRows = await getClassRows(supabaseUrl, secretKey, {
+          select: "id,form_level,class_name,is_active",
+          form_level: "eq." + formLevel,
+          is_active: "eq.true",
+          limit: "200"
+        });
+        const selectedClass = (Array.isArray(classRows) ? classRows : []).find(
+          (item) => String(item.class_name ?? "").toLowerCase() === className.toLowerCase()
+        );
+        if (!selectedClass) {
+          fail("Nama kelas belum didaftarkan atau kelas tidak aktif.");
+          continue;
+        }
+
         const authEmail = username.includes("@")
           ? username
           : username + "@accounts.ekonomismart.invalid";
@@ -452,6 +633,7 @@ Deno.serve(async (req: Request) => {
           role: "student",
           form_level: formLevel,
           class_name: className,
+          academic_class_id: selectedClass.id,
           is_active: true
         };
 
