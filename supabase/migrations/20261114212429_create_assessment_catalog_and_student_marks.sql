@@ -34,8 +34,8 @@ create index student_assessment_marks_student_idx
 alter table public.assessment_catalog enable row level security;
 alter table public.student_assessment_marks enable row level security;
 
-revoke all on table public.assessment_catalog from anon, authenticated;
-revoke all on table public.student_assessment_marks from anon, authenticated;
+revoke all on table public.assessment_catalog from public, anon, authenticated;
+revoke all on table public.student_assessment_marks from public, anon, authenticated;
 grant all on table public.assessment_catalog to service_role;
 grant all on table public.student_assessment_marks to service_role;
 
