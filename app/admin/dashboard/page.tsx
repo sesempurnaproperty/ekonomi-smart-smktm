@@ -74,12 +74,21 @@ export default async function AdminDashboardPage() {
 
         <div className={styles.dashboardGrid}>
           {adminModules.map((module) => (
-            <article className={styles.moduleCard} key={module.number}>
-              <span className={styles.moduleNumber}>{module.number} / MODUL</span>
-              <h3>{module.title}</h3>
-              <p>{module.description}</p>
-              <span className={styles.coming}>{module.status}</span>
-            </article>
+            module.number === "01" ? (
+              <Link className={styles.moduleCard} href="/admin/pengguna" key={module.number}>
+                <span className={styles.moduleNumber}>{module.number} / MODUL</span>
+                <h3>{module.title}</h3>
+                <p>{module.description}</p>
+                <span className={styles.coming}>BUKA MODUL →</span>
+              </Link>
+            ) : (
+              <article className={styles.moduleCard} key={module.number}>
+                <span className={styles.moduleNumber}>{module.number} / MODUL</span>
+                <h3>{module.title}</h3>
+                <p>{module.description}</p>
+                <span className={styles.coming}>{module.status}</span>
+              </article>
+            )
           ))}
         </div>
       </section>
