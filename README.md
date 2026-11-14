@@ -21,6 +21,13 @@ Pengguna mengisi username dan password. Sistem menyemak role daripada `public.us
 
 Role tidak dipilih pada halaman login dan pengguna tidak boleh menukar role sendiri. Setiap dashboard menyemak semula profil di server sebelum memaparkan kandungan.
 
+## Status akaun murid dan senarai operasi
+
+- Semua senarai kelas, roster murid, direktori markah dan import/kemas kini markah hanya memproses profil dengan `is_active = true`.
+- Akaun murid yang dinyahaktifkan tidak boleh log masuk, tidak dipaparkan dalam kelas atau rekod markah operasi, tidak boleh menerima kemas kini markah dan tidak boleh dipindahkan kelas.
+- Rekod akaun dan markah lama tidak dipadam. Ia kekal untuk audit/pemulihan pentadbir melalui Pengurusan Pengguna; mengaktifkan semula akaun akan memasukkannya semula ke paparan operasi.
+- Senarai Pengurusan Pengguna ialah senarai pentadbiran dan sengaja memaparkan akaun aktif serta tidak aktif supaya status boleh diuruskan.
+
 ## Rekod markah
 
 - Markah individu menerima nombor, `TH` (tidak hadir) dan `X`.
