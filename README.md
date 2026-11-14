@@ -23,6 +23,11 @@ Role tidak dipilih pada halaman login dan pengguna tidak boleh menukar role send
 
 ## Rekod markah
 
+- Markah individu menerima nombor, `TH` (tidak hadir) dan `X`.
+- `TH` dipaparkan sebagai gred `T`; `X` dipaparkan sebagai gred `x`.
+- Gred angka automatik: 0–39 G; 40–44 E; 45–49 D; 50–54 C; 55–59 C+; 60–64 B; 65–69 B+; 70–79 A-; 80–89 A; 90 ke atas A+.
+- Markah angka disimpan dalam lajur `score`; status khas disimpan dalam `mark_status`. Satu keputusan tidak boleh mempunyai kedua-dua nilai serentak.
+
 - Katalog pentaksiran menyimpan `PPT2026` dan `PAT2026` serta had markah maksimum yang boleh dilaras oleh pentadbir.
 - `student_assessment_marks` menyimpan satu rekod bagi setiap murid dan pentaksiran.
 - Rekod markah dipautkan kepada `user_profiles.user_id`, jadi ia kekal bersama murid walaupun murid berpindah kelas.
