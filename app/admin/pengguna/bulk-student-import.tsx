@@ -242,31 +242,13 @@ export default function BulkStudentImport({
       const accessToken = sessionData.session?.access_token;
       if (sessionError || !accessToken) throw new Error("Sesi pentadbir tamat. Sila log masuk semula.");
 
-      // Re-read the selected file at the moment of import.
-      const XLSX = await import("@keep-lts/xlsx");
-      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: false });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const table = XLSX.utils.sheet_to_json(worksheet, {
-        header: 1,
-        raw: false,
-        defval: "",
-        blankrows: false
-      }) as unknown[][];
-      const headers = table[0].map(normalizeHeader);
-      const col = {
-        full_name: headers.findIndex((h) => ["nama penuh", "nama", "full name", "full_name", "name"].includes(h)),
-        username: headers.findIndex((h) => ["username", "user name", "user_name"].includes(h)),
-        password: headers.findIndex((h) => ["password", "kata laluan", "kata_laluan"].includes(h)),
-        form_level: headers.findIndex((h) => ["tingkatan", "form", "form level", "form_level"].includes(h)),
-        class_name: headers.findIndex((h) => ["kelas", "class", "class name", "class_name"].includes(h))
-      };
-      const rows = table.slice(1).filter((row) => row.some((cell) => cleanCell(cell) !== "")).map((row, index) => ({
-        row_number: index + 2,
-        full_name: cleanCell(row[col.full_name]),
-        username: cleanCell(row[col.username]).toLowerCase(),
-        password: String(row[col.password] ?? ""),
-        form_level: parseFormLevel(cleanCell(row[col.form_level])),
-        class_name: cleanCell(row[col.class_name])
+      const rows = preview.rows.map((row) => ({
+        row_number: row.row_number,
+        full_name: row.full_name,
+        username: row.username,
+        password: row.password,
+        form_level: row.form_level,
+        class_name: row.class_name
       }));
 
       const response = await fetch(`${supabaseUrl}/functions/v1/admin-user-management`, {
