@@ -25,6 +25,9 @@ type RequestBody = {
   is_active?: unknown;
   class_id?: unknown;
   new_class_name?: unknown;
+  assessment_code?: unknown;
+  max_score?: unknown;
+  marks?: unknown;
   rows?: unknown;
 };
 
@@ -92,6 +95,39 @@ async function getClassRows(
   });
   if (!res.ok) throw new Error(`Class query failed: ${res.status}`);
   return await res.json();
+}
+
+async function getTableRows(
+  supabaseUrl: string,
+  secretKey: string,
+  tableName: string,
+  query: Record<string, string>
+) {
+  const url = new URL("/rest/v1/" + tableName, supabaseUrl);
+  for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
+  const res = await fetch(url, {
+    headers: { apikey: secretKey, Accept: "application/json" }
+  });
+  if (!res.ok) throw new Error(tableName + " query failed: " + res.status);
+  return await res.json();
+}
+
+async function upsertMarkRows(
+  supabaseUrl: string,
+  secretKey: string,
+  rows: Array<Record<string, unknown>>
+) {
+  const url = new URL("/rest/v1/student_assessment_marks", supabaseUrl);
+  url.searchParams.set("on_conflict", "student_id,assessment_code");
+  return await fetch(url, {
+    method: "POST",
+    headers: {
+      apikey: secretKey,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=representation"
+    },
+    body: JSON.stringify(rows)
+  });
 }
 
 Deno.serve(async (req: Request) => {
@@ -374,6 +410,324 @@ Deno.serve(async (req: Request) => {
         return response({ error: "Murid gagal dipindahkan. Rekod asal dikekalkan." }, 502, origin);
       }
       return response({ message: "Murid berjaya dipindahkan ke kelas baharu." }, 200, origin);
+    }
+
+    if (action === "list_mark_classes") {
+      const [classRows, studentRows, markRows, assessmentRows] = await Promise.all([
+        getClassRows(supabaseUrl, secretKey, {
+          select: "id,form_level,class_name,is_active",
+          order: "form_level.asc,class_name.asc",
+          limit: "200"
+        }),
+        getProfileRows(supabaseUrl, secretKey, {
+          select: "user_id,academic_class_id,is_active",
+          role: "eq.student",
+          limit: "1000"
+        }),
+        getTableRows(supabaseUrl, secretKey, "student_assessment_marks", {
+          select: "student_id,assessment_code",
+          limit: "5000"
+        }),
+        getTableRows(supabaseUrl, secretKey, "assessment_catalog", {
+          select: "code,title,max_score,is_active",
+          order: "code.asc"
+        })
+      ]);
+
+      const studentsByClass = new Map<string, Array<{ user_id: string; is_active: boolean }>>();
+      for (const student of (Array.isArray(studentRows) ? studentRows : [])) {
+        if (typeof student.academic_class_id !== "string") continue;
+        const current = studentsByClass.get(student.academic_class_id) ?? [];
+        current.push({ user_id: student.user_id, is_active: student.is_active === true });
+        studentsByClass.set(student.academic_class_id, current);
+      }
+
+      const marksByClass = new Map<string, Record<string, number>>();
+      const studentClassMap = new Map<string, string>();
+      for (const [classId, students] of studentsByClass.entries()) {
+        for (const student of students) studentClassMap.set(student.user_id, classId);
+      }
+      for (const mark of (Array.isArray(markRows) ? markRows : [])) {
+        const classId = studentClassMap.get(mark.student_id);
+        if (!classId || typeof mark.assessment_code !== "string") continue;
+        const tally = marksByClass.get(classId) ?? {};
+        tally[mark.assessment_code] = (tally[mark.assessment_code] ?? 0) + 1;
+        marksByClass.set(classId, tally);
+      }
+
+      const assessments = (Array.isArray(assessmentRows) ? assessmentRows : []).filter((item) => item.is_active === true);
+      const classes = (Array.isArray(classRows) ? classRows : []).map((item) => {
+        const students = studentsByClass.get(item.id) ?? [];
+        const markCounts = marksByClass.get(item.id) ?? {};
+        return {
+          id: item.id,
+          form_level: item.form_level,
+          class_name: item.class_name,
+          is_active: item.is_active,
+          total_students: students.length,
+          active_students: students.filter((student) => student.is_active).length,
+          marks_PPT2026: markCounts.PPT2026 ?? 0,
+          marks_PAT2026: markCounts.PAT2026 ?? 0
+        };
+      });
+
+      return response({ classes, assessments }, 200, origin);
+    }
+
+    if (action === "list_class_marks") {
+      const classId = typeof body.class_id === "string" ? body.class_id : "";
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidPattern.test(classId)) return response({ error: "ID kelas tidak sah." }, 400, origin);
+
+      const [classRows, studentRows, assessmentRows] = await Promise.all([
+        getClassRows(supabaseUrl, secretKey, {
+          select: "id,form_level,class_name,is_active",
+          id: "eq." + classId,
+          limit: "1"
+        }),
+        getProfileRows(supabaseUrl, secretKey, {
+          select: "user_id,username,full_name,form_level,class_name,is_active,academic_class_id",
+          role: "eq.student",
+          academic_class_id: "eq." + classId,
+          order: "full_name.asc",
+          limit: "500"
+        }),
+        getTableRows(supabaseUrl, secretKey, "assessment_catalog", {
+          select: "code,title,max_score,is_active",
+          order: "code.asc"
+        })
+      ]);
+
+      const selectedClass = Array.isArray(classRows) ? classRows[0] : null;
+      if (!selectedClass) return response({ error: "Kelas tidak ditemui." }, 404, origin);
+      const students = Array.isArray(studentRows) ? studentRows : [];
+      const studentIds = students.map((student) => student.user_id).filter((id) => typeof id === "string");
+      let markRows: unknown[] = [];
+
+      if (studentIds.length > 0) {
+        const markQuery = new URL("/rest/v1/student_assessment_marks", supabaseUrl);
+        markQuery.searchParams.set("select", "student_id,assessment_code,score,updated_at");
+        markQuery.searchParams.set("student_id", "in.(" + studentIds.join(",") + ")");
+        markQuery.searchParams.set("limit", "2000");
+        const markResponse = await fetch(markQuery, {
+          headers: { apikey: secretKey, Accept: "application/json" }
+        });
+        if (!markResponse.ok) throw new Error("Student mark query failed: " + markResponse.status);
+        markRows = await markResponse.json();
+      }
+
+      const markMap = new Map<string, Record<string, number | null>>();
+      for (const row of markRows as Array<Record<string, unknown>>) {
+        const marks = markMap.get(String(row.student_id)) ?? {};
+        marks[String(row.assessment_code)] = Number(row.score);
+        markMap.set(String(row.student_id), marks);
+      }
+
+      return response({
+        class: selectedClass,
+        assessments: assessmentRows,
+        students: students.map((student) => ({
+          user_id: student.user_id,
+          username: student.username,
+          full_name: student.full_name,
+          form_level: student.form_level,
+          class_name: student.class_name,
+          is_active: student.is_active,
+          marks: markMap.get(student.user_id) ?? {}
+        }))
+      }, 200, origin);
+    }
+
+    if (action === "set_assessment_max") {
+      const code = body.assessment_code;
+      const maxScore = Number(body.max_score);
+      if ((code !== "PPT2026" && code !== "PAT2026") ||
+          !Number.isFinite(maxScore) || maxScore <= 0 || maxScore > 1000) {
+        return response({ error: "Kod pentaksiran atau markah maksimum tidak sah." }, 400, origin);
+      }
+      const url = new URL("/rest/v1/assessment_catalog", supabaseUrl);
+      url.searchParams.set("code", "eq." + code);
+      const update = await fetch(url, {
+        method: "PATCH",
+        headers: { apikey: secretKey, "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify({ max_score: maxScore, updated_at: new Date().toISOString() })
+      });
+      const rows = await update.json().catch(() => []);
+      if (!update.ok || !Array.isArray(rows) || rows.length === 0) {
+        return response({ error: "Markah maksimum gagal dikemaskini." }, 502, origin);
+      }
+      return response({ message: "Markah maksimum berjaya dikemaskini.", assessment: rows[0] }, 200, origin);
+    }
+
+    if (action === "save_student_marks") {
+      const studentId = typeof body.user_id === "string" ? body.user_id : "";
+      const marks = body.marks && typeof body.marks === "object" && !Array.isArray(body.marks)
+        ? body.marks as Record<string, unknown>
+        : null;
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidPattern.test(studentId) || !marks) return response({ error: "Maklumat murid atau markah tidak sah." }, 400, origin);
+
+      const studentRows = await getProfileRows(supabaseUrl, secretKey, {
+        select: "user_id,role",
+        user_id: "eq." + studentId,
+        limit: "1"
+      });
+      const student = Array.isArray(studentRows) ? studentRows[0] : null;
+      if (!student || student.role !== "student") return response({ error: "Rekod murid tidak ditemui." }, 404, origin);
+
+      const assessmentRows = await getTableRows(supabaseUrl, secretKey, "assessment_catalog", {
+        select: "code,max_score,is_active",
+        is_active: "eq.true",
+        limit: "20"
+      });
+      const catalogue = new Map((Array.isArray(assessmentRows) ? assessmentRows : []).map((item) => [item.code, Number(item.max_score)]));
+      const markRecords: Array<Record<string, unknown>> = [];
+      const clearCodes: string[] = [];
+
+      for (const code of ["PPT2026", "PAT2026"]) {
+        if (!(code in marks)) continue;
+        const raw = marks[code];
+        if (raw === null || raw === "") {
+          clearCodes.push(code);
+          continue;
+        }
+        const score = Number(raw);
+        const maximum = catalogue.get(code);
+        if (!Number.isFinite(score) || score < 0 || maximum === undefined || score > maximum) {
+          return response({ error: "Markah " + code + " mesti antara 0 hingga markah maksimum " + (maximum ?? "yang ditetapkan") + "." }, 400, origin);
+        }
+        markRecords.push({
+          student_id: studentId,
+          assessment_code: code,
+          score,
+          updated_by: callerId,
+          updated_at: new Date().toISOString()
+        });
+      }
+
+      if (markRecords.length > 0) {
+        const saved = await upsertMarkRows(supabaseUrl, secretKey, markRecords);
+        if (!saved.ok) {
+          const detail = await saved.text();
+          console.error("Saving student marks failed:", saved.status, detail);
+          return response({ error: "Markah gagal disimpan. Rekod asal dikekalkan." }, 502, origin);
+        }
+      }
+
+      for (const code of clearCodes) {
+        const url = new URL("/rest/v1/student_assessment_marks", supabaseUrl);
+        url.searchParams.set("student_id", "eq." + studentId);
+        url.searchParams.set("assessment_code", "eq." + code);
+        const cleared = await fetch(url, {
+          method: "DELETE",
+          headers: { apikey: secretKey }
+        });
+        if (!cleared.ok) return response({ error: "Markah " + code + " gagal dikosongkan." }, 502, origin);
+      }
+
+      return response({ message: "Rekod markah murid berjaya dikemaskini." }, 200, origin);
+    }
+
+    if (action === "bulk_save_class_marks") {
+      const classId = typeof body.class_id === "string" ? body.class_id : "";
+      const rows = Array.isArray(body.rows) ? body.rows : [];
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidPattern.test(classId) || rows.length < 1 || rows.length > 500) {
+        return response({ error: "Kelas atau jumlah rekod import tidak sah." }, 400, origin);
+      }
+
+      const [classRows, studentRows, assessmentRows] = await Promise.all([
+        getClassRows(supabaseUrl, secretKey, {
+          select: "id,form_level,class_name",
+          id: "eq." + classId,
+          limit: "1"
+        }),
+        getProfileRows(supabaseUrl, secretKey, {
+          select: "user_id,username,full_name",
+          role: "eq.student",
+          academic_class_id: "eq." + classId,
+          limit: "500"
+        }),
+        getTableRows(supabaseUrl, secretKey, "assessment_catalog", {
+          select: "code,max_score,is_active",
+          is_active: "eq.true",
+          limit: "20"
+        })
+      ]);
+      const selectedClass = Array.isArray(classRows) ? classRows[0] : null;
+      if (!selectedClass) return response({ error: "Kelas tidak ditemui." }, 404, origin);
+
+      const students = Array.isArray(studentRows) ? studentRows : [];
+      const byUsername = new Map(students.map((student) => [String(student.username).toLowerCase(), student]));
+      const maxScores = new Map((Array.isArray(assessmentRows) ? assessmentRows : []).map((item) => [item.code, Number(item.max_score)]));
+      const seen = new Set<string>();
+      const output: Array<Record<string, unknown>> = [];
+      const records: Array<Record<string, unknown>> = [];
+
+      for (let index = 0; index < rows.length; index += 1) {
+        const row = rows[index] as Record<string, unknown>;
+        const username = typeof row?.username === "string" ? row.username.trim().toLowerCase() : "";
+        const student = byUsername.get(username);
+        const rowNumber = Number.isInteger(row?.row_number) ? Number(row.row_number) : index + 2;
+        if (!student) {
+          output.push({ row_number: rowNumber, username, success: false, message: "Username tidak ditemui dalam kelas ini." });
+          continue;
+        }
+        if (seen.has(username)) {
+          output.push({ row_number: rowNumber, username, success: false, message: "Username berulang dalam fail." });
+          continue;
+        }
+        seen.add(username);
+
+        const rowRecords: Array<Record<string, unknown>> = [];
+        let issue = "";
+        for (const code of ["PPT2026", "PAT2026"]) {
+          const raw = row[code];
+          if (raw === null || raw === undefined || String(raw).trim() === "") continue;
+          const score = Number(raw);
+          const maximum = maxScores.get(code);
+          if (!Number.isFinite(score) || score < 0 || maximum === undefined || score > maximum) {
+            issue = "Markah " + code + " mesti antara 0 hingga " + (maximum ?? "markah maksimum") + ".";
+            break;
+          }
+          rowRecords.push({
+            student_id: student.user_id,
+            assessment_code: code,
+            score,
+            updated_by: callerId,
+            updated_at: new Date().toISOString()
+          });
+        }
+        if (issue) {
+          output.push({ row_number: rowNumber, username, full_name: student.full_name, success: false, message: issue });
+          continue;
+        }
+        if (rowRecords.length === 0) {
+          output.push({ row_number: rowNumber, username, full_name: student.full_name, success: true, message: "Tiada markah diisi; rekod sedia ada dikekalkan.", unchanged: true });
+          continue;
+        }
+        records.push(...rowRecords);
+        output.push({ row_number: rowNumber, username, full_name: student.full_name, success: true, message: "Markah diterima untuk dikemaskini." });
+      }
+
+      if (records.length > 0) {
+        const saved = await upsertMarkRows(supabaseUrl, secretKey, records);
+        if (!saved.ok) {
+          const detail = await saved.text();
+          console.error("Bulk student marks save failed:", saved.status, detail);
+          return response({ error: "Import markah gagal disimpan. Semak fail dan cuba semula." }, 502, origin);
+        }
+      }
+
+      const updatedStudents = output.filter((item) => item.success === true && item.unchanged !== true).length;
+      const failed = output.filter((item) => item.success !== true).length;
+      return response({
+        total: rows.length,
+        updated: updatedStudents,
+        failed,
+        results: output,
+        message: "Import markah kelas selesai diproses."
+      }, 200, origin);
     }
 
     if (action === "create") {
