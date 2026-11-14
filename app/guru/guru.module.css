@@ -134,6 +134,8 @@
 .accountCard span { color: #168063; font-size: 10px; font-weight: 700; }
 .dashboardGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 24px; }
 .moduleCard {
+  display: block;
+  text-decoration: none;
   min-height: 168px; padding: 21px; border: 1px solid #e1e9e2; border-radius: 9px; background: #fff;
 }
 .moduleNumber { color: #c09b50; font-size: 9px; font-weight: 800; letter-spacing: .12em; }
