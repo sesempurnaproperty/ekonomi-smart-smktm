@@ -13,7 +13,7 @@ export default function TeacherLogoutButton() {
     setLoading(true);
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.replace("/guru/login");
+    router.replace("/login");
     router.refresh();
   }
 
