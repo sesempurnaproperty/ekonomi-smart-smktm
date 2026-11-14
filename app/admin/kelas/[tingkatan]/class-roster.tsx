@@ -224,7 +224,7 @@ export default function ClassRoster({
       <div className={styles.classManagementPanel}>
         <div>
           <span className={styles.classLevel}>MAKLUMAT DAN TINDAKAN KELAS</span>
-          <p className={styles.classCardSub}>Kelas ini mempunyai {students.length} murid berdaftar, {activeCount} akaun aktif.</p>
+          <p className={styles.classCardSub}>Kelas ini mempunyai {students.length} murid aktif berdaftar.</p>
         </div>
         <div className={styles.classManagementActions}>
           <button className={styles.classActionButton} type="button" onClick={() => void handleClassStatus(!classIsActive)}>
@@ -248,7 +248,7 @@ export default function ClassRoster({
         <div>
           <span className={styles.classLevel}>SENARAI MURID · TINGKATAN {formLevel}</span>
           <h2 className={styles.className}>{className}</h2>
-          <p className={styles.classCardSub}>{students.length} murid · {activeCount} akaun aktif</p>
+          <p className={styles.classCardSub}>{students.length} murid aktif</p>
         </div>
         <div className={styles.rosterToolButtons}>
           <input className={styles.rosterSearch} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama atau username murid..." aria-label="Cari nama atau username murid"/>
