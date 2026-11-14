@@ -545,6 +545,16 @@ Deno.serve(async (req: Request) => {
           !Number.isFinite(maxScore) || maxScore <= 0 || maxScore > 1000) {
         return response({ error: "Kod pentaksiran atau markah maksimum tidak sah." }, 400, origin);
       }
+      const existingMarks = await getTableRows(supabaseUrl, secretKey, "student_assessment_marks", {
+        select: "score",
+        assessment_code: "eq." + code,
+        limit: "5000"
+      });
+      const highestExisting = Math.max(0, ...(Array.isArray(existingMarks) ? existingMarks.map((item) => Number(item.score)) : []));
+      if (maxScore < highestExisting) {
+        return response({ error: "Markah maksimum baharu tidak boleh lebih rendah daripada markah sedia ada tertinggi (" + highestExisting + ")." }, 409, origin);
+      }
+
       const url = new URL("/rest/v1/assessment_catalog", supabaseUrl);
       url.searchParams.set("code", "eq." + code);
       const update = await fetch(url, {
