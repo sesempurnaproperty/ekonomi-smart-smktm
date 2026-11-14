@@ -1,0 +1,49 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getCurrentProfile } from "../../../lib/auth/get-current-profile";
+import styles from "../../guru/guru.module.css";
+import marksStyles from "./marks.module.css";
+import TeacherLogoutButton from "../../guru/dashboard/logout-button";
+import MarkClassDirectory from "./class-directory";
+
+export const metadata: Metadata = {
+  title: "Rekod Markah | Ekonomi Smart SMKTM",
+  description: "Pengurusan markah PPT2026 dan PAT2026 bagi murid Ekonomi SMK Taman Medan."
+};
+
+export default async function MarksDirectoryPage() {
+  const profile = await getCurrentProfile();
+  if (!profile) redirect("/login");
+  if (profile.role !== "admin") {
+    redirect(profile.role === "teacher" ? "/guru/dashboard" : "/murid/dashboard");
+  }
+
+  return (
+    <main className={styles.dashboardShell}>
+      <header className={styles.dashboardHeader}>
+        <Link className={styles.brand} href="/" aria-label="Ekonomi Smart SMKTM">
+          <span className={styles.brandMark}>ES</span>
+          <span className={styles.brandText}>
+            <strong>EKONOMI<span>SMART</span></strong>
+            <small>REKOD MARKAH · SMK TAMAN MEDAN</small>
+          </span>
+        </Link>
+        <div className={styles.dashboardActions}>
+          <Link className={marksStyles.classBack ?? ""} href="/admin/dashboard">← DASHBOARD</Link>
+          <span className={styles.teacherBadge}>PENTADBIR</span>
+          <TeacherLogoutButton />
+        </div>
+      </header>
+
+      <section className={styles.dashboardMain}>
+        <span className={styles.dashboardKicker}>PUSAT DATA PENTAKSIRAN</span>
+        <h1 className={styles.dashboardTitle}>Rekod markah<br /><em>murid.</em></h1>
+        <p className={styles.dashboardIntro}>
+          Kemas kini markah PPT2026 dan PAT2026 bagi setiap murid. Pilih kelas untuk melihat dan mengurus rekod mereka.
+        </p>
+        <MarkClassDirectory />
+      </section>
+    </main>
+  );
+}
