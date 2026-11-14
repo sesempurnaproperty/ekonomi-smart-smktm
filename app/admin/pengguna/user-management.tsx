@@ -16,9 +16,17 @@ type UserRecord = {
   is_active: boolean;
   created_at: string;
 };
+type ClassOption = {
+  id: string;
+  form_level: number;
+  class_name: string;
+  is_active: boolean;
+  total_students: number;
+};
 type ApiResponse = {
   users?: UserRecord[];
-  user?: UserRecord;
+  user?: UserRecord[];
+  classes?: ClassOption[];
   message?: string;
   error?: string;
 };
@@ -61,7 +69,8 @@ export default function UserManagement() {
   const [role, setRole] = useState<"teacher" | "student">("teacher");
   const [password, setPassword] = useState("");
   const [formLevel, setFormLevel] = useState("4");
-  const [className, setClassName] = useState("");
+  const [classId, setClassId] = useState("");
+  const [classOptions, setClassOptions] = useState<ClassOption[]>([]);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [listError, setListError] = useState("");
 
@@ -69,8 +78,12 @@ export default function UserManagement() {
     setLoadingUsers(true);
     setListError("");
     try {
-      const result = await callManagementApi({ action: "list" });
+      const [result, classResult] = await Promise.all([
+        callManagementApi({ action: "list" }),
+        callManagementApi({ action: "list_classes" })
+      ]);
       setUsers(result.users ?? []);
+      setClassOptions(classResult.classes ?? []);
     } catch (error) {
       setListError(error instanceof Error ? error.message : "Senarai pengguna gagal dimuatkan.");
     } finally {
@@ -88,14 +101,18 @@ export default function UserManagement() {
     setNotice(null);
 
     try {
+      const selectedClass = classOptions.find((item) => item.id === classId && item.is_active);
+      if (role === "student" && !selectedClass) {
+        throw new Error("Pilih kelas aktif yang telah didaftarkan dalam Modul Pengurusan Kelas.");
+      }
       const result = await callManagementApi({
         action: "create",
         username,
         full_name: fullName,
         role,
         password,
-        form_level: role === "student" ? Number(formLevel) : null,
-        class_name: role === "student" ? className : null
+        form_level: role === "student" ? selectedClass?.form_level : null,
+        class_name: role === "student" ? selectedClass?.class_name : null
       });
 
       setNotice({
@@ -105,7 +122,7 @@ export default function UserManagement() {
       setUsername("");
       setFullName("");
       setPassword("");
-      setClassName("");
+      setClassId("");
       await loadUsers();
     } catch (error) {
       setNotice({
@@ -235,23 +252,32 @@ export default function UserManagement() {
                   id="new-form-level"
                   className={styles.userSelect}
                   value={formLevel}
-                  onChange={(event) => setFormLevel(event.target.value)}
+                  onChange={(event) => {
+                    setFormLevel(event.target.value);
+                    setClassId("");
+                  }}
                 >
                   <option value="4">Tingkatan 4</option>
                   <option value="5">Tingkatan 5</option>
                 </select>
               </div>
               <div className={styles.userField}>
-                <label htmlFor="new-class-name">KELAS</label>
-                <input
-                  id="new-class-name"
-                  className={styles.userInput}
-                  value={className}
-                  onChange={(event) => setClassName(event.target.value)}
-                  placeholder="Contoh: 4 Cekal"
+                <label htmlFor="new-class-id">KELAS</label>
+                <select
+                  id="new-class-id"
+                  className={styles.userSelect}
+                  value={classId}
+                  onChange={(event) => setClassId(event.target.value)}
                   required
-                  maxLength={60}
-                />
+                >
+                  <option value="">Pilih kelas Tingkatan {formLevel}</option>
+                  {classOptions
+                    .filter((item) => item.is_active && item.form_level === Number(formLevel))
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>{item.class_name}</option>
+                    ))}
+                </select>
+                <span className={styles.userFieldHint}>Jika kelas belum ada, cipta dahulu melalui Modul Pengurusan Kelas.</span>
               </div>
             </>
           ) : null}
