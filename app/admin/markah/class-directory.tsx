@@ -64,7 +64,7 @@ export default function MarkClassDirectory() {
     <>
       <div className={styles.markSummary}>
         <div className={styles.markSummaryCard}><strong>{classes.length}</strong><span>JUMLAH KELAS</span></div>
-        <div className={styles.markSummaryCard}><strong>{studentTotal}</strong><span>JUMLAH MURID</span></div>
+        <div className={styles.markSummaryCard}><strong>{studentTotal}</strong><span>MURID AKTIF</span></div>
         <div className={styles.markSummaryCard}><strong>{assessments.length}</strong><span>PENTAKSIRAN AKTIF</span></div>
       </div>
 
@@ -79,7 +79,7 @@ export default function MarkClassDirectory() {
               <span className={styles.classLevel}>TINGKATAN {item.form_level} · {item.is_active ? "KELAS AKTIF" : "KELAS TIDAK AKTIF"}</span>
               <h2 className={styles.markClassTitle}>{item.class_name}</h2>
               <div className={styles.markCardFoot}>
-                <span>{item.total_students} murid · {item.active_students} akaun aktif</span>
+                <span>{item.total_students} murid aktif</span>
                 <span>BUKA →</span>
               </div>
               <div className={styles.markExamStats}>
