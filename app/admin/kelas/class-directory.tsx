@@ -140,8 +140,8 @@ export default function ClassDirectory() {
             <span>JUMLAH MURID</span>
           </div>
           <div className={styles.summaryPill}>
-            <strong>{activeStudents}</strong>
-            <span>AKAUN AKTIF</span>
+            <strong>{classes.filter((item) => item.is_active).length}</strong>
+            <span>KELAS AKTIF</span>
           </div>
         </div>
       </div>
