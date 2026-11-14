@@ -1,0 +1,114 @@
+.backButton {
+  padding: 9px 12px;
+  border: 1px solid #dfe7e1;
+  border-radius: 5px;
+  color: #466a5c;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+.userManagement {
+  margin-top: 34px;
+  display: grid;
+  grid-template-columns: minmax(300px, .82fr) minmax(0, 1.18fr);
+  gap: 20px;
+  align-items: start;
+}
+.userPanel {
+  padding: 24px;
+  border: 1px solid #e0e9e1;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 8px 26px rgba(18,55,40,.035);
+}
+.panelKicker {
+  color: #168063;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+.panelTitle { margin: 9px 0 7px; color: #173a31; font-size: 19px; letter-spacing: -.04em; }
+.panelDescription { margin: 0 0 22px; color: #829088; font-size: 10px; line-height: 1.7; }
+.userForm { display: grid; gap: 14px; }
+.userField { display: grid; gap: 7px; }
+.userField label { color: #36564b; font-size: 9px; font-weight: 800; }
+.userInput, .userSelect {
+  width: 100%;
+  min-height: 43px;
+  padding: 0 12px;
+  border: 1px solid #dfe7e1;
+  border-radius: 6px;
+  outline: none;
+  background: #fbfcfa;
+  color: #173a31;
+  font: inherit;
+  font-size: 11px;
+}
+.userInput:focus, .userSelect:focus {
+  border-color: #4baf89;
+  box-shadow: 0 0 0 3px rgba(75,175,137,.12);
+  background: #fff;
+}
+.userInput::placeholder { color: #a8b4ad; }
+.userPasswordWrap { position: relative; }
+.userPasswordWrap .userInput { padding-right: 70px; }
+.passwordToggle {
+  position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
+  border: 0; background: transparent; color: #168063; cursor: pointer;
+  font-size: 8px; font-weight: 800;
+}
+.userFieldHint { color: #9aa69f; font-size: 8px; line-height: 1.5; }
+.userSubmit {
+  min-height: 45px; margin-top: 3px; border: 0; border-radius: 6px;
+  background: #147b60; color: #fff; cursor: pointer;
+  font: inherit; font-size: 10px; font-weight: 800; letter-spacing: .04em;
+}
+.userSubmit:hover:not(:disabled) { background: #0e654e; }
+.userSubmit:disabled { opacity: .65; cursor: wait; }
+.userNotice {
+  margin-top: 15px; padding: 11px 12px; border-radius: 6px;
+  font-size: 9px; line-height: 1.6;
+}
+.userNoticeSuccess { background: #edf8f1; border: 1px solid #d3eadb; color: #17694f; }
+.userNoticeError { background: #fff7f5; border: 1px solid #f0d6d2; color: #a33d34; }
+.userTableTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 16px; }
+.userCount { color: #84928a; font-size: 9px; }
+.refreshButton {
+  padding: 8px 10px; border: 1px solid #dfe7e1; border-radius: 5px;
+  background: #fff; color: #366151; cursor: pointer; font-size: 8px; font-weight: 800;
+}
+.userTableWrap { width: 100%; overflow-x: auto; }
+.userTable { width: 100%; border-collapse: collapse; white-space: nowrap; }
+.userTable th {
+  padding: 10px 9px; border-bottom: 1px solid #e5ece6;
+  color: #94a198; text-align: left; font-size: 8px; font-weight: 800; letter-spacing: .08em;
+}
+.userTable td { padding: 12px 9px; border-bottom: 1px solid #eef2ee; color: #476158; font-size: 9px; }
+.userName { color: #173a31 !important; font-weight: 800; }
+.rolePill, .statusPill {
+  display: inline-flex; align-items: center; border-radius: 30px;
+  padding: 5px 8px; font-size: 7px; font-weight: 800; letter-spacing: .06em;
+}
+.roleAdmin { color: #12644c; background: #e0f4e9; }
+.roleTeacher { color: #315f99; background: #eaf2fb; }
+.roleStudent { color: #8a6b2a; background: #fbf1d9; }
+.statusActive { color: #16775b; background: #e8f6ed; }
+.statusInactive { color: #a23f35; background: #fff0ed; }
+.statusButton {
+  border: 1px solid #dfe7e1; border-radius: 5px; padding: 6px 8px;
+  background: #fff; color: #557166; cursor: pointer; font-size: 7px; font-weight: 800;
+}
+.emptyUsers { padding: 32px 16px; color: #95a199; font-size: 10px; text-align: center; }
+.bulkNotice {
+  margin-top: 18px; padding: 15px 16px; border: 1px dashed #d8c79c;
+  border-radius: 8px; background: #fbf7eb; color: #7b6841;
+}
+.bulkNotice strong { display: block; font-size: 9px; }
+.bulkNotice p { margin: 6px 0 0; font-size: 8px; line-height: 1.65; }
+@media (max-width: 900px) {
+  .userManagement { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .userPanel { padding: 18px; }
+  .userTable th, .userTable td { padding-left: 7px; padding-right: 7px; }
+}
