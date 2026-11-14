@@ -15,30 +15,42 @@ const adminModules = [
     number: "01",
     title: "Pengurusan pengguna",
     description: "Daftar guru, tetapkan peranan dan import akaun murid secara pukal.",
-    status: "MODUL SETERUSNYA"
+    href: "/admin/pengguna",
+    status: "BUKA PENGURUSAN PENGGUNA →"
   },
   {
     number: "02",
     title: "Pengurusan kelas",
     description: "Lihat kad kelas dan senarai murid mengikut Tingkatan 4 dan Tingkatan 5.",
-    status: "BUKA DIREKTORI KELAS"
+    href: "/admin/kelas",
+    status: "BUKA DIREKTORI KELAS →"
   },
   {
     number: "03",
     title: "Rekod markah murid",
     description: "Kemas kini keputusan PPT2026 dan PAT2026 bagi setiap murid.",
-    status: "BUKA REKOD MARKAH"
+    href: "/admin/markah",
+    status: "BUKA REKOD MARKAH →"
   },
   {
     number: "04",
-    title: "Pengurusan pembelajaran",
-    description: "Urus kandungan Ekonomi Tingkatan 4 dan Tingkatan 5.",
-    status: "DALAM PEMBANGUNAN"
+    title: "Analitik pencapaian",
+    description: "Rumusan prestasi mengikut tingkatan, kelas dan setiap murid termasuk perkembangan PPT ke PAT.",
+    href: "/admin/analitik",
+    status: "BUKA ANALITIK PENCAPAIAN →"
   },
   {
     number: "05",
+    title: "Pengurusan pembelajaran",
+    description: "Urus kandungan Ekonomi Tingkatan 4 dan Tingkatan 5.",
+    href: null,
+    status: "DALAM PEMBANGUNAN"
+  },
+  {
+    number: "06",
     title: "Pentaksiran dan kuiz",
     description: "Sediakan latihan, kuiz dan penilaian murid.",
+    href: null,
     status: "DALAM PEMBANGUNAN"
   }
 ];
@@ -85,26 +97,20 @@ export default async function AdminDashboardPage() {
         </div>
 
         <div className={styles.dashboardGrid}>
-          {adminModules.map((module) => (
-            ["01", "02", "03"].includes(module.number) ? (
-              <Link
-                className={styles.moduleCard}
-                href={module.number === "01" ? "/admin/pengguna" : module.number === "02" ? "/admin/kelas" : "/admin/markah"}
-                key={module.number}
-              >
-                <span className={styles.moduleNumber}>{module.number} / MODUL</span>
-                <h3>{module.title}</h3>
-                <p>{module.description}</p>
-                <span className={styles.coming}>{module.number === "01" ? "BUKA MODUL →" : module.number === "02" ? "BUKA DIREKTORI KELAS →" : "BUKA REKOD MARKAH →"}</span>
-              </Link>
-            ) : (
-              <article className={styles.moduleCard} key={module.number}>
-                <span className={styles.moduleNumber}>{module.number} / MODUL</span>
-                <h3>{module.title}</h3>
-                <p>{module.description}</p>
-                <span className={styles.coming}>{module.status}</span>
-              </article>
-            )
+          {adminModules.map((module) => module.href ? (
+            <Link className={styles.moduleCard} href={module.href} key={module.number}>
+              <span className={styles.moduleNumber}>{module.number} / MODUL</span>
+              <h3>{module.title}</h3>
+              <p>{module.description}</p>
+              <span className={styles.coming}>{module.status}</span>
+            </Link>
+          ) : (
+            <article className={styles.moduleCard} key={module.number}>
+              <span className={styles.moduleNumber}>{module.number} / MODUL</span>
+              <h3>{module.title}</h3>
+              <p>{module.description}</p>
+              <span className={styles.coming}>{module.status}</span>
+            </article>
           ))}
         </div>
       </section>
