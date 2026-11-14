@@ -159,6 +159,29 @@ export default function AnalyticsDashboard() {
   const gradeMax = Math.max(1, ...gradeOrder.map((grade) => currentSummary.grades[grade] ?? 0));
   const latestLabel = lastUpdated ? new Date(lastUpdated).toLocaleString("ms-MY", { dateStyle: "medium", timeStyle: "short" }) : "Belum ada rekod";
 
+  const numericResults = filteredStudents
+    .map((student) => ({ student, score: student.marks[assessmentCode] ?? null }))
+    .filter((item): item is { student: Student; score: number } => isNumeric(item.score));
+  const zeroResults = numericResults.filter((item) => item.score === 0)
+    .sort((a, b) => a.student.full_name.localeCompare(b.student.full_name));
+  const supportResults = numericResults.filter((item) => item.score > 0 && item.score < 40)
+    .sort((a, b) => a.score - b.score || a.student.full_name.localeCompare(b.student.full_name));
+  const urgentResults = supportResults.filter((item) => item.score < 20);
+  const targetedResults = supportResults.filter((item) => item.score >= 20 && item.score < 40);
+  const borderlineResults = supportResults.filter((item) => item.score >= 35 && item.score < 40);
+  const topResults = [...numericResults].filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.student.full_name.localeCompare(b.student.full_name))
+    .slice(0, 5);
+  const performanceBands = [
+    { label: "Cemerlang", range: "80–100", count: numericResults.filter((item) => item.score >= 80).length, className: styles.bandExcellent },
+    { label: "Baik", range: "65–79", count: numericResults.filter((item) => item.score >= 65 && item.score < 80).length, className: styles.bandGood },
+    { label: "Memuaskan", range: "50–64", count: numericResults.filter((item) => item.score >= 50 && item.score < 65).length, className: styles.bandSatisfactory },
+    { label: "Lulus minimum", range: "40–49", count: numericResults.filter((item) => item.score >= 40 && item.score < 50).length, className: styles.bandPass },
+    { label: "Intervensi", range: "1–39", count: supportResults.length, className: styles.bandSupport },
+    { label: "Sifar · semak", range: "0", count: zeroResults.length, className: styles.bandZero }
+  ];
+  const distributionDenominator = Math.max(1, numericResults.length);
+
   return (
     <div className={styles.analyticsWrap}>
       <div className={styles.analyticsToolbar}>
@@ -272,6 +295,114 @@ export default function AnalyticsDashboard() {
               </table>
             </div>
             <p className={styles.footerNote}>Penting: nilai 0 adalah markah angka dan mempengaruhi perubahan. Semak amaran data sifar sebelum menggunakan keputusan perbandingan untuk laporan rasmi.</p>
+          </section>
+
+          <div className={styles.twoColumn}>
+            <section className={styles.sectionCard}>
+              <div className={styles.sectionHeader}>
+                <div>
+                  <span className={styles.sectionEyebrow}>AGIHAN PENCAPAIAN</span>
+                  <h2 className={styles.sectionTitle}>Profil kumpulan markah</h2>
+                  <p className={styles.sectionNote}>Pecahan murid mengikut julat markah bagi pentaksiran dan penapis yang dipilih.</p>
+                </div>
+              </div>
+              <div className={styles.bandList}>
+                {performanceBands.map((band) => (
+                  <div className={styles.bandRow} key={band.label}>
+                    <div className={styles.bandHeading}>
+                      <span>{band.label} <small>{band.range}</small></span>
+                      <strong>{band.count} <small>({fmt(band.count / distributionDenominator * 100)}%)</small></strong>
+                    </div>
+                    <div className={styles.bandTrack}>
+                      <div className={`${styles.bandFill} ${band.className}`} style={{ width: `${band.count / distributionDenominator * 100}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className={styles.footerNote}>Peratus agihan menggunakan markah angka sahaja. TH, X dan rekod belum diisi tidak termasuk dalam pengiraan.</p>
+            </section>
+
+            <section className={styles.sectionCard}>
+              <div className={styles.sectionHeader}>
+                <div>
+                  <span className={styles.sectionEyebrow}>KEDUDUKAN PENCAPAIAN</span>
+                  <h2 className={styles.sectionTitle}>Lima markah tertinggi</h2>
+                  <p className={styles.sectionNote}>Senarai teratas dalam skop penapis semasa. Markah sifar tidak disenaraikan sebagai pencapaian.</p>
+                </div>
+              </div>
+              {topResults.length ? (
+                <div className={styles.tableScroll}>
+                  <table className={styles.analyticsTable}>
+                    <thead><tr><th>BIL.</th><th>NAMA MURID</th><th>KELAS</th><th>MARKAH</th><th>GRED</th></tr></thead>
+                    <tbody>{topResults.map((item, index) => (
+                      <tr key={item.student.user_id}>
+                        <td>{index + 1}</td>
+                        <td className={styles.studentName}>{item.student.full_name}</td>
+                        <td>T{item.student.form_level} {item.student.class_name}</td>
+                        <td className={styles.numeric}>{fmt(item.score, 0)}</td>
+                        <td><span className={`${styles.statusPill} ${styles.statusUp}`}>{gradeFromScore(item.score)}</span></td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              ) : <div className={styles.emptyBox}>Belum ada markah angka melebihi sifar dalam skop ini.</div>}
+            </section>
+          </div>
+
+          <section className={styles.sectionCard}>
+            <div className={styles.sectionHeader}>
+              <div>
+                <span className={styles.sectionEyebrow}>ANALISIS DIAGNOSTIK & INTERVENSI</span>
+                <h2 className={styles.sectionTitle}>Keutamaan tindakan guru</h2>
+                <p className={styles.sectionNote}>Pengelasan berasaskan markah pentaksiran yang dipilih. Rekod sifar diasingkan daripada murid yang mendapat markah 1–39 supaya markah yang belum disahkan tidak terus dianggap kelemahan penguasaan.</p>
+              </div>
+            </div>
+            <div className={styles.insightGrid}>
+              <div className={styles.insightCard}><span className={styles.insightLabel}>INTERVENSI SEGERA · 1–19</span><strong className={styles.insightValue}>{urgentResults.length} murid</strong></div>
+              <div className={styles.insightCard}><span className={styles.insightLabel}>PENGUKUHAN · 20–39</span><strong className={styles.insightValue}>{targetedResults.length} murid</strong></div>
+              <div className={styles.insightCard}><span className={styles.insightLabel}>HAMPIR LULUS · 35–39</span><strong className={styles.insightValue}>{borderlineResults.length} murid</strong></div>
+            </div>
+
+            <div className={styles.twoColumn} style={{ marginTop: 16 }}>
+              <div>
+                <h3 className={styles.subTitle}>Murid untuk intervensi (1–39)</h3>
+                {supportResults.length ? (
+                  <div className={styles.tableScroll}>
+                    <table className={styles.analyticsTable}>
+                      <thead><tr><th>NAMA MURID</th><th>KELAS</th><th>MARKAH</th><th>FOKUS</th></tr></thead>
+                      <tbody>{supportResults.slice(0, 12).map((item) => (
+                        <tr key={item.student.user_id}>
+                          <td className={styles.studentName}>{item.student.full_name}</td>
+                          <td>T{item.student.form_level} {item.student.class_name}</td>
+                          <td className={styles.numeric}>{fmt(item.score, 0)}</td>
+                          <td><span className={`${styles.statusPill} ${item.score < 20 ? styles.statusDown : styles.statusPending}`}>{item.score < 20 ? "Intervensi segera" : item.score >= 35 ? "Hampir lulus" : "Pengukuhan"}</span></td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                ) : <div className={styles.emptyBox}>Tiada murid dengan markah 1–39 dalam skop semasa.</div>}
+                {supportResults.length > 12 ? <p className={styles.footerNote}>Paparan 12 daripada {supportResults.length} murid. Senarai penuh tersedia dalam jadual perkembangan setiap murid di bawah.</p> : null}
+              </div>
+
+              <div>
+                <h3 className={styles.subTitle}>Rekod markah sifar untuk pengesahan</h3>
+                {zeroResults.length ? (
+                  <>
+                    <div className={styles.alertBox}>
+                      <strong>{zeroResults.length} rekod sifar</strong> dikesan bagi pentaksiran ini. Sahkan sama ada markah 0 ialah keputusan sebenar atau rekod sementara sebelum analisis intervensi rasmi.
+                    </div>
+                    <div className={styles.zeroList}>
+                      {zeroResults.slice(0, 10).map((item) => (
+                        <div className={styles.zeroItem} key={item.student.user_id}>
+                          <span>{item.student.full_name}</span><strong>T{item.student.form_level} {item.student.class_name}</strong>
+                        </div>
+                      ))}
+                    </div>
+                    {zeroResults.length > 10 ? <p className={styles.footerNote}>Paparan 10 daripada {zeroResults.length} rekod sifar. Semua rekod boleh dijejaki melalui senarai murid.</p> : null}
+                  </>
+                ) : <div className={styles.infoBox}>Tiada rekod markah sifar dalam skop pentaksiran ini.</div>}
+              </div>
+            </div>
           </section>
 
           <section className={styles.sectionCard}>
