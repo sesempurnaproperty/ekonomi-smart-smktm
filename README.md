@@ -9,25 +9,30 @@ Platform pembelajaran digital bagi mata pelajaran Ekonomi Tingkatan 4 dan Tingka
 - Supabase Auth, PostgreSQL, Row Level Security dan Edge Functions
 - Vercel untuk hosting dan deployment automatik daripada GitHub
 
-## Modul semasa
+## Portal pengguna
 
-- Halaman utama responsif.
-- Login guru menggunakan username dan password.
-- Username guru dipadankan di Edge Function dengan akaun dalaman Supabase Auth.
-- Kata laluan disahkan oleh Supabase Auth; kata laluan tidak disimpan dalam jadual aplikasi.
-- Dashboard guru dilindungi semakan sesi dan rekod akaun guru aktif.
+Satu halaman login digunakan oleh semua pengguna: `/login`.
 
-## Persediaan akaun guru pertama
+Pengguna mengisi username dan password. Sistem menyemak role daripada `public.user_profiles` dan mengalihkan pengguna ke ruang yang betul:
 
-1. Cipta pengguna Auth melalui Supabase Dashboard > Authentication > Users.
-2. Sahkan pengguna tersebut (email confirmed) di Dashboard.
-3. Catat UUID pengguna Auth.
-4. Tambah rekod ke `public.teacher_accounts` menggunakan UUID, username lowercase dan display name.
-5. Pastikan `is_active = true`.
+- `admin` → `/admin/dashboard`
+- `teacher` → `/guru/dashboard`
+- `student` → `/murid/dashboard`
 
-Format username: 3–32 aksara, huruf kecil, nombor, titik, garis bawah atau sempang. Contoh format sahaja: `guru.ikmal`.
+Role tidak dipilih pada halaman login dan pengguna tidak boleh menukar role sendiri. Setiap dashboard menyemak semula profil di server sebelum memaparkan kandungan.
 
-Jangan masukkan password ke jadual `teacher_accounts`. Tetapkan atau reset password melalui Supabase Auth sahaja.
+## Profil dan keselamatan
+
+- `public.user_profiles` ialah jadual pusat profil dan role.
+- `public.teacher_accounts` dikekalkan sebagai jadual legacy; ia tidak dipadam dalam migrasi ini.
+- Kata laluan disimpan dan disahkan oleh Supabase Auth sahaja.
+- RLS membenarkan pengguna membaca profil sendiri sahaja.
+- Penetapan role dan pengurusan akaun perlu dibuat oleh fungsi pentadbiran di server.
+- Jangan commit `.env`, Supabase secret key, service-role key atau kata laluan ke GitHub.
+
+## Import murid
+
+Modul import pukal akan menyokong batch pertama seramai 61 murid. Username dan password ditentukan serta dibekalkan oleh pentadbir, kemudian sistem mencipta akaun Auth dan profil role `student`.
 
 ## Pembangunan setempat
 
@@ -38,21 +43,16 @@ npm run dev
 
 Buka http://localhost:3000.
 
-## Fasa seterusnya
+## Status pembangunan
 
 - [x] Halaman utama responsif dan identiti visual
 - [x] Sambungan GitHub–Vercel dengan deployment automatik
 - [x] Supabase browser/server client dan session refresh
-- [x] Struktur akaun guru dengan RLS
-- [x] Edge Function login guru menggunakan username
-- [x] Halaman login guru dan dashboard terlindung
-- [ ] Akaun guru pertama diaktifkan
-- [ ] Pengurusan akaun murid secara import pukal (batch pertama: 61 murid)
+- [x] Jadual pusat user_profiles dengan role admin, teacher dan student
+- [x] Login tunggal berasaskan username + password
+- [x] Dashboard berasingan dengan semakan role di server
+- [ ] Pengurusan akaun guru dan murid melalui dashboard admin
+- [ ] Import pukal 61 akaun murid
 - [ ] Modul pembelajaran Tingkatan 4 dan Tingkatan 5
-- [ ] Nota, video, latihan dan kuiz
+- [ ] Nota, video, latihan, kuiz dan analisis pencapaian
 - [ ] Penjana soalan menggunakan AI
-- [ ] Analisis pencapaian murid
-
-## Keselamatan
-
-Repository ini bersifat Public. Jangan commit fail `.env`, kata laluan, Supabase secret/service-role key atau maklumat sulit. Gunakan pemboleh ubah persekitaran Vercel untuk konfigurasi rahsia. Akses data murid mesti dilindungi dengan Row Level Security.
