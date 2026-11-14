@@ -19,6 +19,12 @@ const adminModules = [
   },
   {
     number: "02",
+    title: "Pengurusan kelas",
+    description: "Lihat kad kelas dan senarai murid mengikut Tingkatan 4 dan Tingkatan 5.",
+    status: "BUKA DIREKTORI KELAS"
+  },
+  {
+    number: "03",
     title: "Pengurusan pembelajaran",
     description: "Urus kandungan Ekonomi Tingkatan 4 dan Tingkatan 5.",
     status: "DALAM PEMBANGUNAN"
@@ -74,12 +80,12 @@ export default async function AdminDashboardPage() {
 
         <div className={styles.dashboardGrid}>
           {adminModules.map((module) => (
-            module.number === "01" ? (
+            module.number === "01" || module.number === "02" ? (
               <Link className={styles.moduleCard} href="/admin/pengguna" key={module.number}>
                 <span className={styles.moduleNumber}>{module.number} / MODUL</span>
                 <h3>{module.title}</h3>
                 <p>{module.description}</p>
-                <span className={styles.coming}>BUKA MODUL →</span>
+                <span className={styles.coming}>{module.number === "01" ? "BUKA MODUL →" : "BUKA DIREKTORI KELAS →"}</span>
               </Link>
             ) : (
               <article className={styles.moduleCard} key={module.number}>
