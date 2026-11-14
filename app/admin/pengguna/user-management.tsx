@@ -25,7 +25,7 @@ type ClassOption = {
 };
 type ApiResponse = {
   users?: UserRecord[];
-  user?: UserRecord[];
+  user?: UserRecord;
   classes?: ClassOption[];
   message?: string;
   error?: string;
