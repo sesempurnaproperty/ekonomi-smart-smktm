@@ -70,7 +70,12 @@ function summarize(students: Student[], code: string, maxScore: number) {
   const grades = Object.fromEntries(gradeOrder.map((grade) => [grade, numeric.filter((value) => gradeFromScore(value) === grade).length])) as Record<string, number>;
   return {
     total: students.length, numeric: numeric.length, th, x, recorded, missing: Math.max(0, students.length - recorded),
-    pass, fail, zeros, passRate: numeric.length ? pass / numeric.length * 100 : null,
+    pass, fail, zeros,
+    intervention: numeric.filter((value) => value > 0 && value < 40).length,
+    urgent: numeric.filter((value) => value > 0 && value < 20).length,
+    nearPass: numeric.filter((value) => value >= 35 && value < 40).length,
+    excellent: numeric.filter((value) => value >= 80).length,
+    passRate: numeric.length ? pass / numeric.length * 100 : null,
     average, median, highest: numeric.length ? Math.max(...numeric) : null, lowest: numeric.length ? Math.min(...numeric) : null,
     coverage: students.length ? recorded / students.length * 100 : null, grades, maxScore
   };
@@ -234,8 +239,8 @@ export default function AnalyticsDashboard() {
             </div>
             <div className={styles.tableScroll}>
               <table className={styles.analyticsTable}>
-                <thead><tr><th>TINGKATAN</th><th>MURID AKTIF</th><th>PURATA</th><th>LULUS</th><th>GAGAL</th><th>KADAR LULUS</th><th>LIPUTAN</th></tr></thead>
-                <tbody>{formSummaries.map(({ level, summary }) => <tr key={level}><td className={styles.studentName}>Tingkatan {level}</td><td className={styles.numeric}>{summary.total}</td><td className={styles.numeric}>{fmt(summary.average)}</td><td className={styles.numeric}>{summary.pass}</td><td className={styles.numeric}>{summary.fail}</td><td className={styles.numeric}>{summary.passRate === null ? "—" : fmt(summary.passRate) + "%"}</td><td className={styles.numeric}>{summary.coverage === null ? "—" : fmt(summary.coverage) + "%"}</td></tr>)}</tbody>
+                <thead><tr><th>TINGKATAN</th><th>MURID AKTIF</th><th>PURATA</th><th>LULUS</th><th>GAGAL</th><th>KADAR LULUS</th><th>INTERVENSI</th><th>HAMPIR LULUS</th><th>SIFAR</th><th>LIPUTAN</th></tr></thead>
+                <tbody>{formSummaries.map(({ level, summary }) => <tr key={level}><td className={styles.studentName}>Tingkatan {level}</td><td className={styles.numeric}>{summary.total}</td><td className={styles.numeric}>{fmt(summary.average)}</td><td className={styles.numeric}>{summary.pass}</td><td className={styles.numeric}>{summary.fail}</td><td className={styles.numeric}>{summary.passRate === null ? "—" : fmt(summary.passRate) + "%"}</td><td className={styles.numeric}>{summary.intervention}</td><td className={styles.numeric}>{summary.nearPass}</td><td className={styles.numeric}>{summary.zeros}</td><td className={styles.numeric}>{summary.coverage === null ? "—" : fmt(summary.coverage) + "%"}</td></tr>)}</tbody>
               </table>
             </div>
           </section>
@@ -252,7 +257,7 @@ export default function AnalyticsDashboard() {
                     </div>
                   ))}
                 </div>
-                <div className={styles.tableScroll}><table className={styles.analyticsTable}><thead><tr><th>KELAS</th><th>MURID</th><th>PURATA</th><th>LULUS</th><th>KADAR LULUS</th></tr></thead><tbody>{classSummaries.map(({ item, summary }) => <tr key={item.id}><td className={styles.studentName}>T{item.form_level} {item.class_name}</td><td className={styles.numeric}>{summary.total}</td><td className={styles.numeric}>{fmt(summary.average)}</td><td className={styles.numeric}>{summary.pass}/{summary.numeric}</td><td className={styles.numeric}>{summary.passRate === null ? "—" : fmt(summary.passRate) + "%"}</td></tr>)}</tbody></table></div>
+                <div className={styles.tableScroll}><table className={styles.analyticsTable}><thead><tr><th>KELAS</th><th>MURID</th><th>PURATA</th><th>LULUS</th><th>KADAR LULUS</th><th>INTERVENSI</th><th>HAMPIR LULUS</th><th>SIFAR</th></tr></thead><tbody>{classSummaries.map(({ item, summary }) => <tr key={item.id}><td className={styles.studentName}>T{item.form_level} {item.class_name}</td><td className={styles.numeric}>{summary.total}</td><td className={styles.numeric}>{fmt(summary.average)}</td><td className={styles.numeric}>{summary.pass}/{summary.numeric}</td><td className={styles.numeric}>{summary.passRate === null ? "—" : fmt(summary.passRate) + "%"}</td><td className={styles.numeric}>{summary.intervention}</td><td className={styles.numeric}>{summary.nearPass}</td><td className={styles.numeric}>{summary.zeros}</td></tr>)}</tbody></table></div>
               </> : <div className={styles.emptyBox}>Tiada kelas aktif dalam pilihan.</div>}
             </section>
 
