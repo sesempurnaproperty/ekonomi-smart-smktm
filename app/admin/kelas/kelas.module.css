@@ -218,3 +218,76 @@
   font-size: 9px;
   text-align: center;
 }
+
+
+.classCardInactive { opacity: .66; filter: grayscale(.25); }
+.classGroupSection { margin-top: 34px; }
+.classRefreshRow { display: flex; justify-content: flex-end; margin-top: 22px; }
+.classCreatePanel {
+  margin: 24px 0 32px; padding: 23px;
+  display: grid; grid-template-columns: minmax(240px, .9fr) minmax(0,1.1fr);
+  gap: 18px; align-items: center;
+  border: 1px solid #dfebe1; border-radius: 10px; background: #fff;
+}
+.createClassTitle { margin: 8px 0 6px; color: #173a31; font-size: 18px; letter-spacing: -.04em; }
+.createClassDescription { margin: 0; color: #819087; font-size: 9px; line-height: 1.7; }
+.createClassForm { display: grid; grid-template-columns: .75fr 1.2fr auto; gap: 8px; }
+.classFormInput {
+  width: 100%; min-height: 40px; padding: 0 10px;
+  border: 1px solid #dfe7e1; border-radius: 5px; background: #fbfcfa;
+  color: #173a31; font: inherit; font-size: 9px;
+}
+.classCreateButton {
+  min-height: 40px; padding: 0 13px; border: 0; border-radius: 5px;
+  background: #147b60; color: #fff; cursor: pointer; font: inherit;
+  font-size: 8px; font-weight: 900; white-space: nowrap;
+}
+.classCreateButton:disabled { opacity: .5; cursor: not-allowed; }
+.classNotice { grid-column: 1 / -1; padding: 10px 12px; border-radius: 6px; color: #536f62; background: #f2f7f2; font-size: 9px; line-height: 1.5; }
+.classNoticeSuccess { border: 1px solid #d3eadb; color: #17694f; background: #edf8f1; }
+.classNoticeError { border: 1px solid #f0d6d2; color: #a33d34; background: #fff7f5; }
+.classManagementPanel {
+  padding-bottom: 16px; margin-bottom: 18px;
+  display: flex; justify-content: space-between; align-items: center; gap: 14px;
+  border-bottom: 1px solid #e7eee8;
+}
+.classManagementActions, .rosterToolButtons { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.classActionButton, .classDangerButton {
+  min-height: 34px; padding: 0 10px; border: 1px solid #dfe7e1;
+  border-radius: 5px; background: #fff; color: #426755; cursor: pointer;
+  font: inherit; font-size: 7px; font-weight: 900; letter-spacing: .04em;
+}
+.classDangerButton { border-color: #edd5d0; color: #a33d34; }
+.renameClassForm {
+  display: grid; grid-template-columns: 100px 1fr auto; gap: 10px; align-items: center;
+  padding: 13px; margin-bottom: 20px; border: 1px solid #edf1ed; border-radius: 7px; background: #fafcf9;
+}
+.renameClassForm label { color: #71847a; font-size: 8px; font-weight: 900; letter-spacing: .08em; }
+.transferCell { display: flex; gap: 5px; align-items: center; }
+.transferSelect {
+  max-width: 145px; min-height: 30px; padding: 0 6px;
+  border: 1px solid #dfe7e1; border-radius: 4px; color: #355b4a; background: #fff; font: inherit; font-size: 8px;
+}
+.transferButton {
+  min-height: 30px; padding: 0 8px; border: 0; border-radius: 4px;
+  background: #147b60; color: #fff; cursor: pointer; font: inherit; font-size: 7px; font-weight: 900;
+}
+.transferButton:disabled { opacity: .4; cursor: not-allowed; }
+@media (max-width: 860px) {
+  .classCreatePanel { grid-template-columns: 1fr; }
+  .createClassForm { grid-template-columns: .75fr 1.2fr auto; }
+  .rosterToolButtons { flex-direction: column; align-items: stretch; }
+}
+@media (max-width: 560px) {
+  .classCreatePanel { padding: 17px; }
+  .createClassForm { grid-template-columns: 1fr; }
+  .classManagementPanel { align-items: flex-start; flex-direction: column; }
+  .renameClassForm { grid-template-columns: 1fr; }
+  .transferCell { flex-direction: column; align-items: stretch; }
+  .transferSelect { max-width: none; width: 135px; }
+}
+@media print {
+  .noPrint { display: none !important; }
+  .rosterPanel { border: 0 !important; box-shadow: none !important; }
+  .rosterTable th, .rosterTable td { color: #000 !important; }
+}
