@@ -506,7 +506,7 @@ Deno.serve(async (req: Request) => {
 
       if (studentIds.length > 0) {
         const markQuery = new URL("/rest/v1/student_assessment_marks", supabaseUrl);
-        markQuery.searchParams.set("select", "student_id,assessment_code,score,updated_at");
+        markQuery.searchParams.set("select", "student_id,assessment_code,score,mark_status,updated_at");
         markQuery.searchParams.set("student_id", "in.(" + studentIds.join(",") + ")");
         markQuery.searchParams.set("limit", "2000");
         const markResponse = await fetch(markQuery, {
@@ -516,10 +516,10 @@ Deno.serve(async (req: Request) => {
         markRows = await markResponse.json();
       }
 
-      const markMap = new Map<string, Record<string, number | null>>();
+      const markMap = new Map<string, Record<string, number | string | null>>();
       for (const row of markRows as Array<Record<string, unknown>>) {
         const marks = markMap.get(String(row.student_id)) ?? {};
-        marks[String(row.assessment_code)] = Number(row.score);
+        marks[String(row.assessment_code)] = row.mark_status === "TH" || row.mark_status === "X" ? row.mark_status : row.score === null ? null : Number(row.score);
         markMap.set(String(row.student_id), marks);
       }
 
@@ -597,19 +597,34 @@ Deno.serve(async (req: Request) => {
       for (const code of ["PPT2026", "PAT2026"]) {
         if (!(code in marks)) continue;
         const raw = marks[code];
-        if (raw === null || raw === "") {
+        if (raw === null || raw === undefined || raw === "") {
           clearCodes.push(code);
           continue;
         }
+
+        const token = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+        if (token === "TH" || token === "X") {
+          markRecords.push({
+            student_id: studentId,
+            assessment_code: code,
+            score: null,
+            mark_status: token,
+            updated_by: callerId,
+            updated_at: new Date().toISOString()
+          });
+          continue;
+        }
+
         const score = Number(raw);
         const maximum = catalogue.get(code);
         if (!Number.isFinite(score) || score < 0 || maximum === undefined || score > maximum) {
-          return response({ error: "Markah " + code + " mesti antara 0 hingga markah maksimum " + (maximum ?? "yang ditetapkan") + "." }, 400, origin);
+          return response({ error: "Markah " + code + " mesti antara 0 hingga markah maksimum " + (maximum ?? "yang ditetapkan") + ", atau gunakan TH/X." }, 400, origin);
         }
         markRecords.push({
           student_id: studentId,
           assessment_code: code,
           score,
+          mark_status: null,
           updated_by: callerId,
           updated_at: new Date().toISOString()
         });
@@ -694,16 +709,31 @@ Deno.serve(async (req: Request) => {
         for (const code of ["PPT2026", "PAT2026"]) {
           const raw = row[code];
           if (raw === null || raw === undefined || String(raw).trim() === "") continue;
+
+          const token = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+          if (token === "TH" || token === "X") {
+            rowRecords.push({
+              student_id: student.user_id,
+              assessment_code: code,
+              score: null,
+              mark_status: token,
+              updated_by: callerId,
+              updated_at: new Date().toISOString()
+            });
+            continue;
+          }
+
           const score = Number(raw);
           const maximum = maxScores.get(code);
           if (!Number.isFinite(score) || score < 0 || maximum === undefined || score > maximum) {
-            issue = "Markah " + code + " mesti antara 0 hingga " + (maximum ?? "markah maksimum") + ".";
+            issue = "Markah " + code + " mesti antara 0 hingga " + (maximum ?? "markah maksimum") + ", atau gunakan TH/X.";
             break;
           }
           rowRecords.push({
             student_id: student.user_id,
             assessment_code: code,
             score,
+            mark_status: null,
             updated_by: callerId,
             updated_at: new Date().toISOString()
           });
