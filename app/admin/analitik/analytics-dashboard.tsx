@@ -186,6 +186,9 @@ export default function AnalyticsDashboard() {
     { label: "Sifar · semak", range: "0", count: zeroResults.length, className: styles.bandZero }
   ];
   const distributionDenominator = Math.max(1, numericResults.length);
+  const pendingPat5CekalZeros = assessmentCode === "PAT2026"
+    ? filteredStudents.filter((student) => student.form_level === 5 && student.class_name.toLowerCase() === "cekal" && student.marks.PAT2026 === 0).length
+    : 0;
 
   return (
     <div className={styles.analyticsWrap}>
@@ -229,7 +232,16 @@ export default function AnalyticsDashboard() {
 
           {currentSummary.zeros > 0 && (
             <div className={styles.alertBox}>
-              <strong>Semakan markah sifar:</strong> terdapat <strong>{currentSummary.zeros}</strong> rekod bernilai 0 bagi {currentAssessment?.title ?? assessmentCode} dalam skop pilihan ini. Markah sifar dikira dalam purata dan kadar gagal kerana ia direkodkan sebagai angka. Sahkan rekod ini sebelum membuat rumusan rasmi.
+              {pendingPat5CekalZeros > 0 ? (
+                <>
+                  <strong>Data sementara PAT 5 Cekal:</strong> terdapat <strong>{pendingPat5CekalZeros}</strong> rekod bernilai 0 yang menunggu kemas kini markah. Buat masa ini, angka tersebut masih dimasukkan dalam purata dan kadar gagal. Jangan gunakan rumusan PAT 5 Cekal sebagai keputusan muktamad sehingga markah sebenar dikemaskini.
+                  {currentSummary.zeros > pendingPat5CekalZeros ? <> Terdapat juga <strong>{currentSummary.zeros - pendingPat5CekalZeros}</strong> rekod sifar lain dalam skop pilihan.</> : null}
+                </>
+              ) : (
+                <>
+                  <strong>Semakan markah sifar:</strong> terdapat <strong>{currentSummary.zeros}</strong> rekod bernilai 0 bagi {currentAssessment?.title ?? assessmentCode} dalam skop pilihan ini. Markah sifar dikira dalam purata dan kadar gagal kerana ia direkodkan sebagai angka. Sahkan rekod ini sebelum membuat rumusan rasmi.
+                </>
+              )}
             </div>
           )}
 
