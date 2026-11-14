@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { createClient } from "../../../lib/supabase/client";
 import styles from "./users.module.css";
+import BulkStudentImport from "./bulk-student-import";
 
 type Role = "admin" | "teacher" | "student";
 type UserRecord = {
@@ -341,10 +342,11 @@ export default function UserManagement() {
         </div>
 
         <div className={styles.bulkNotice}>
-          <strong>IMPORT PUKAL 61 MURID — FASA SETERUSNYA</strong>
-          <p>Fungsi import Excel/CSV akan ditambah selepas aliran cipta akaun individu disahkan. Username dan password kekal mengikut senarai yang cikgu sediakan.</p>
+          <strong>IMPORT PUKAL 61 MURID — SEDIA DIGUNAKAN</strong>
+          <p>Muat naik template Excel/CSV di bawah. Sistem menyemak rekod, username pendua dan format data sebelum mencipta akaun Supabase Auth.</p>
         </div>
       </div>
+      <BulkStudentImport onImported={loadUsers} />
     </section>
   );
 }
