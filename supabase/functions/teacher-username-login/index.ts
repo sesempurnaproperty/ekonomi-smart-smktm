@@ -77,7 +77,7 @@ Deno.serve(async (request: Request) => {
   const password = typeof body.password === "string" ? body.password : "";
 
   if (
-    !/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username) ||
+    !/^(?:[a-z0-9][a-z0-9._-]{2,31}|[a-z0-9][a-z0-9._+-]{0,63}@[a-z0-9][a-z0-9.-]{0,187}\.[a-z]{2,24})$/.test(username) ||
     password.length < 1 ||
     password.length > 256
   ) {
