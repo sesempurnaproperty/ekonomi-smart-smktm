@@ -1,0 +1,65 @@
+.performanceSection { margin-top:28px; display:grid; gap:15px; }
+.sectionHeader { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; }
+.sectionEyebrow { display:block; color:#168063; font-size:9px; font-weight:900; letter-spacing:.15em; }
+.sectionTitle { margin:7px 0 0; color:#102b30; font-size:25px; line-height:1.15; letter-spacing:-.045em; }
+.sectionDescription { max-width:640px; margin:7px 0 0; color:#718178; font-size:11px; line-height:1.75; }
+.refreshButton { flex:0 0 auto; min-height:39px; padding:0 13px; border:1px solid #d9e5dc; border-radius:7px; background:#fff; color:#24674f; cursor:pointer; font:inherit; font-size:10px; font-weight:800; }
+.refreshButton:disabled { opacity:.6; cursor:wait; }
+.markGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; }
+.markCard { padding:19px; border:1px solid #e0e9e1; border-radius:11px; background:#fff; box-shadow:0 8px 24px rgba(20,52,39,.035); }
+.markCardTop { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.markCardLabel { color:#52675d; font-size:10px; font-weight:850; line-height:1.5; letter-spacing:.03em; }
+.recordBadge,.pendingBadge { display:inline-flex; align-items:center; padding:5px 8px; border-radius:30px; background:#e7f4eb; color:#28714e; font-size:8px; font-weight:900; letter-spacing:.07em; white-space:nowrap; }
+.pendingBadge { background:#fff1d5; color:#91651c; }
+.markDisplay { display:flex; align-items:baseline; gap:7px; margin-top:18px; }
+.markDisplay strong { color:#12382b; font-size:37px; line-height:1; font-weight:900; letter-spacing:-.06em; }
+.markDisplay span { color:#8a9890; font-size:11px; }
+.markCardFoot { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:13px; color:#718078; font-size:10px; font-weight:700; }
+.markTrack { height:7px; margin-top:12px; border-radius:30px; background:#eef3ef; overflow:hidden; }
+.markFill { height:100%; border-radius:30px; background:linear-gradient(90deg,#168063,#80c5a0); }
+.pendingNotice { display:grid; gap:6px; padding:14px 16px; border:1px solid #ecd9a7; border-radius:10px; background:#fff9e9; color:#75591f; font-size:11px; line-height:1.65; }
+.pendingNotice strong { color:#654b16; font-size:12px; }
+.progressCard { display:grid; grid-template-columns:1fr auto; gap:8px 18px; align-items:center; padding:19px; border:1px solid #e0e9e1; border-radius:11px; background:#fff; }
+.progressCard h3 { margin:7px 0 4px; color:#1a3a30; font-size:16px; letter-spacing:-.03em; }
+.progressCard p { margin:0; color:#7b8981; font-size:10px; line-height:1.6; }
+.progressValue { grid-column:2; grid-row:1; display:flex; flex-direction:column; align-items:flex-end; }
+.progressValue strong { color:#1b7454; font-size:34px; line-height:1; letter-spacing:-.05em; font-variant-numeric:tabular-nums; }
+.progressValue span { margin-top:5px; color:#8a9890; font-size:9px; }
+.progressPending { color:#9aa69f !important; }
+.progressDetail { grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:8px 18px; padding-top:10px; border-top:1px solid #eff3f0; color:#6b7b72; font-size:10px; font-weight:700; }
+.positiveText { color:#168052 !important; }
+.urgentText { color:#b44b3e !important; }
+.tonePositive { color:#168052 !important; }
+.toneUrgent { color:#b44b3e !important; }
+.toneNeutral { color:#79867f !important; }
+.actionPlan { padding:20px; border:1px solid #dfe9e1; border-radius:11px; background:#fff; }
+.actionPositive { border-color:#d5e9dc; background:#f9fcf9; }
+.actionFocus { border-color:#ecdcb8; background:#fffdf7; }
+.actionUrgent { border-color:#f0d2ca; background:#fff9f7; }
+.actionNeutral { background:#fbfcfb; }
+.actionHead { display:flex; justify-content:space-between; align-items:center; gap:14px; }
+.actionHead h3 { margin:7px 0 5px; color:#17382c; font-size:19px; letter-spacing:-.035em; }
+.actionHead p { margin:0; color:#7b8981; font-size:10px; line-height:1.6; }
+.actionScore { display:grid; place-items:center; width:52px; height:52px; flex:0 0 52px; border-radius:50%; background:#eaf3ed; color:#1b6e4e; font-size:17px; font-weight:900; }
+.actionUrgent .actionScore { background:#f8e7e2; color:#b34e41; }
+.actionFocus .actionScore { background:#f8f0dc; color:#98712a; }
+.actionExplanation { margin:16px 0 0; color:#4e6256; font-size:11px; line-height:1.7; }
+.actionList { margin:11px 0 0; padding-left:19px; display:grid; gap:8px; color:#4f6257; font-size:11px; line-height:1.65; }
+.studentGuidance { padding:13px 15px; border:1px solid #e6ece7; border-radius:9px; background:#f8faf8; }
+.studentGuidance strong { color:#3d594a; font-size:10px; }
+.studentGuidance p { margin:5px 0 0; color:#718078; font-size:10px; line-height:1.7; }
+.updatedNote { margin:0; color:#909c95; font-size:9px; line-height:1.6; }
+.stateBox,.errorBox { padding:17px; border:1px dashed #cfdcd3; border-radius:9px; color:#6e7e74; background:#fff; font-size:11px; }
+.errorBox { border-color:#e7c6c1; color:#a33d34; background:#fff7f5; }
+@media (max-width:760px) {
+  .sectionHeader { align-items:flex-start; flex-direction:column; }
+  .markGrid { grid-template-columns:1fr; }
+  .progressCard { padding:15px; }
+  .actionPlan { padding:16px; }
+  .sectionTitle { font-size:22px; }
+  .markDisplay strong { font-size:34px; }
+}
+@media print {
+  .refreshButton { display:none; }
+  .markCard,.progressCard,.actionPlan { break-inside:avoid; box-shadow:none; }
+}
