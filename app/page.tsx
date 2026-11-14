@@ -107,7 +107,7 @@ export default function Home() {
           <a href="#modul">Akses pantas</a>
           <a href="#tentang">Tentang</a>
         </nav>
-        <a className="student-link" href="#modul">Ruang murid <span>↗</span></a>
+        <a className="student-link" href="/guru/login">Log masuk guru <span>↗</span></a>
         <a className="mobile-nav" href="#modul" aria-label="Pergi ke modul">☰</a>
       </header>
 
