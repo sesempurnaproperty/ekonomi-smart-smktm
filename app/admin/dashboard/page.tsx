@@ -25,12 +25,18 @@ const adminModules = [
   },
   {
     number: "03",
+    title: "Rekod markah murid",
+    description: "Kemas kini keputusan PPT2026 dan PAT2026 bagi setiap murid.",
+    status: "BUKA REKOD MARKAH"
+  },
+  {
+    number: "04",
     title: "Pengurusan pembelajaran",
     description: "Urus kandungan Ekonomi Tingkatan 4 dan Tingkatan 5.",
     status: "DALAM PEMBANGUNAN"
   },
   {
-    number: "04",
+    number: "05",
     title: "Pentaksiran dan kuiz",
     description: "Sediakan latihan, kuiz dan penilaian murid.",
     status: "DALAM PEMBANGUNAN"
@@ -80,16 +86,16 @@ export default async function AdminDashboardPage() {
 
         <div className={styles.dashboardGrid}>
           {adminModules.map((module) => (
-            module.number === "01" || module.number === "02" ? (
+            ["01", "02", "03"].includes(module.number) ? (
               <Link
                 className={styles.moduleCard}
-                href={module.number === "01" ? "/admin/pengguna" : "/admin/kelas"}
+                href={module.number === "01" ? "/admin/pengguna" : module.number === "02" ? "/admin/kelas" : "/admin/markah"}
                 key={module.number}
               >
                 <span className={styles.moduleNumber}>{module.number} / MODUL</span>
                 <h3>{module.title}</h3>
                 <p>{module.description}</p>
-                <span className={styles.coming}>{module.number === "01" ? "BUKA MODUL →" : "BUKA DIREKTORI KELAS →"}</span>
+                <span className={styles.coming}>{module.number === "01" ? "BUKA MODUL →" : module.number === "02" ? "BUKA DIREKTORI KELAS →" : "BUKA REKOD MARKAH →"}</span>
               </Link>
             ) : (
               <article className={styles.moduleCard} key={module.number}>
