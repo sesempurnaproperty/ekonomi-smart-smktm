@@ -16,7 +16,7 @@ export default async function ClassDetailPage({
   searchParams
 }: {
   params: Promise<{ tingkatan: string }>;
-  searchParams: Promise<{ kelas?: string }>;
+  searchParams: Promise<{ kelas?: string; class_id?: string }>;
 }) {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
@@ -27,8 +27,9 @@ export default async function ClassDetailPage({
   const [{ tingkatan }, query] = await Promise.all([params, searchParams]);
   const formLevel = Number(tingkatan);
   const className = typeof query.kelas === "string" ? query.kelas.trim() : "";
+  const classId = typeof query.class_id === "string" ? query.class_id : "";
 
-  if (![4, 5].includes(formLevel) || !className || className.length > 60) notFound();
+  if (![4, 5].includes(formLevel) || !className || className.length > 60 || !classId) notFound();
 
   return (
     <main className={styles.dashboardShell}>
@@ -37,7 +38,7 @@ export default async function ClassDetailPage({
           <span className={styles.brandMark}>ES</span>
           <span className={styles.brandText}>
             <strong>EKONOMI<span>SMART</span></strong>
-            <small>SENARAI MURID · SMK TAMAN MEDAN</small>
+            <small>PENGURUSAN KELAS · SMK TAMAN MEDAN</small>
           </span>
         </Link>
         <div className={styles.dashboardActions}>
@@ -50,10 +51,8 @@ export default async function ClassDetailPage({
       <section className={styles.dashboardMain}>
         <span className={styles.dashboardKicker}>DIREKTORI KELAS · TINGKATAN {formLevel}</span>
         <h1 className={styles.dashboardTitle}>Kelas <em>{className}.</em></h1>
-        <p className={styles.dashboardIntro}>
-          Senarai murid, username dan status akaun bagi kelas ini.
-        </p>
-        <ClassRoster formLevel={formLevel} className={className} />
+        <p className={styles.dashboardIntro}>Urus nama kelas, pindahkan murid, cetak atau eksport senarai kelas.</p>
+        <ClassRoster classId={classId} formLevel={formLevel} className={className}/>
       </section>
     </main>
   );
