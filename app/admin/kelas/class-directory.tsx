@@ -51,7 +51,6 @@ async function callAdmin(payload: Record<string, unknown>): Promise<ClassApiResp
 export default function ClassDirectory() {
   const [classes, setClasses] = useState<ClassRecord[]>([]);
   const [totalStudents, setTotalStudents] = useState(0);
-  const [activeStudents, setActiveStudents] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [newLevel, setNewLevel] = useState("4");
@@ -66,7 +65,6 @@ export default function ClassDirectory() {
       const result = await callAdmin({ action: "list_classes" });
       setClasses(result.classes ?? []);
       setTotalStudents(result.total_students ?? 0);
-      setActiveStudents(result.active_students ?? 0);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Senarai kelas gagal dimuatkan.");
     } finally {
@@ -119,13 +117,10 @@ export default function ClassDirectory() {
             <div className={styles.classCardBottom}>
               <div className={styles.classCount}>
                 <strong>{item.total_students}</strong>
-                <span>ORANG MURID</span>
+                <span>MURID AKTIF</span>
               </div>
               <span className={styles.classArrow}>→</span>
             </div>
-            <span className={styles.classStateNote}>
-              {item.active_students} aktif · {item.inactive_students} tidak aktif
-            </span>
           </Link>
         ))}
       </div>
