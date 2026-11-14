@@ -96,12 +96,12 @@ export default function TeacherLoginForm() {
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}
-          placeholder="Masukkan username guru"
+          placeholder="Masukkan username atau e-mel DELIMa"
           value={username}
           onChange={(event) => setUsername(event.target.value)}
           required
           minLength={3}
-          maxLength={32}
+          maxLength={254}
         />
       </div>
 
