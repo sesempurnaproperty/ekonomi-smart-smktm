@@ -314,7 +314,7 @@ export default function UserManagement() {
                   <td>{user.role === "student" ? `T${user.form_level ?? "—"} · ${user.class_name ?? "—"}` : "—"}</td>
                   <td>
                     <span className={`${styles.statusPill} ${user.is_active ? styles.statusActive : styles.statusInactive}`}>
-                      {user.is_active ? "AKTIF" : "DI NYAHAKTIF"}
+                      {user.is_active ? "AKTIF" : "NYAHAKTIF"}
                     </span>
                   </td>
                   <td>
