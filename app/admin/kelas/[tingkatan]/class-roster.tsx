@@ -69,6 +69,7 @@ export default function ClassRoster({
   const [savingRename, setSavingRename] = useState(false);
   const [movingStudent, setMovingStudent] = useState("");
   const [targetClasses, setTargetClasses] = useState<Record<string, string>>({});
+  const [classIsActive, setClassIsActive] = useState(true);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -80,6 +81,8 @@ export default function ClassRoster({
       ]);
       setStudents(roster.students ?? []);
       setClasses((directory.classes ?? []).filter((item) => item.is_active));
+      const currentClass = (directory.classes ?? []).find((item) => item.id === classId);
+      setClassIsActive(currentClass?.is_active ?? true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Senarai murid gagal dimuatkan.");
     } finally {
@@ -129,6 +132,7 @@ export default function ClassRoster({
     if (!window.confirm(`Adakah cikgu pasti mahu ${actionText} kelas ${className}?`)) return;
     try {
       const result = await callAdmin({ action: "set_class_status", class_id: classId, is_active: active });
+      setClassIsActive(active);
       setNotice(result.message ?? "Status kelas dikemaskini.");
       router.refresh();
     } catch (cause) {
@@ -204,7 +208,9 @@ export default function ClassRoster({
           <p className={styles.classCardSub}>Kelas ini mempunyai {students.length} murid berdaftar, {activeCount} akaun aktif.</p>
         </div>
         <div className={styles.classManagementActions}>
-          <button className={styles.classActionButton} type="button" onClick={() => void handleClassStatus(false)}>NYAHAKTIFKAN KELAS</button>
+          <button className={styles.classActionButton} type="button" onClick={() => void handleClassStatus(!classIsActive)}>
+            {classIsActive ? "NYAHAKTIFKAN KELAS" : "AKTIFKAN SEMULA KELAS"}
+          </button>
           {students.length === 0 ? (
             <button className={styles.classDangerButton} type="button" onClick={() => void handleDeleteClass()}>PADAM KELAS KOSONG</button>
           ) : null}
