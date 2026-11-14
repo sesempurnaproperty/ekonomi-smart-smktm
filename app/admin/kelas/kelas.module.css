@@ -1,0 +1,213 @@
+.classPageIntro {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+.classSummary {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.summaryPill {
+  min-width: 112px;
+  padding: 11px 13px;
+  border: 1px solid #e1e9e2;
+  border-radius: 7px;
+  background: #fff;
+}
+.summaryPill strong { display: block; color: #173a31; font-size: 19px; letter-spacing: -.04em; }
+.summaryPill span { display: block; margin-top: 3px; color: #88968f; font-size: 7px; font-weight: 800; letter-spacing: .12em; }
+.classGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 26px;
+}
+.classCard {
+  min-height: 224px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #dce9df;
+  border-radius: 11px;
+  background: linear-gradient(145deg, #ffffff 0%, #f3f8f3 100%);
+  box-shadow: 0 9px 28px rgba(15,58,42,.045);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.classCard:hover {
+  transform: translateY(-4px);
+  border-color: #a8d4bb;
+  box-shadow: 0 16px 35px rgba(15,58,42,.10);
+}
+.classCard::after {
+  content: "";
+  position: absolute;
+  width: 160px; height: 160px;
+  right: -54px; top: 42px;
+  border: 1px solid rgba(20,123,96,.11);
+  border-radius: 50%;
+  box-shadow: 0 0 0 18px rgba(20,123,96,.025), 0 0 0 38px rgba(20,123,96,.018);
+}
+.classCardTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; position: relative; z-index: 1; }
+.classLevel {
+  color: #168063;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+.classBadge {
+  padding: 6px 9px;
+  border-radius: 20px;
+  background: #e7f5ec;
+  color: #197354;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+.className {
+  margin: 25px 0 4px;
+  position: relative;
+  z-index: 1;
+  color: #102d30;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -.055em;
+}
+.classCardSub {
+  color: #85958c;
+  font-size: 9px;
+}
+.classCardBottom {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  position: relative;
+  z-index: 1;
+}
+.classCount strong {
+  display: block;
+  color: #147b60;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: -.06em;
+}
+.classCount span {
+  display: block;
+  margin-top: 5px;
+  color: #819188;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+.classArrow {
+  width: 35px; height: 35px;
+  display: grid; place-items: center;
+  border: 1px solid #dce9df;
+  border-radius: 50%;
+  background: #fff;
+  color: #147b60;
+  font-size: 16px;
+}
+.classStateNote { margin-top: 12px; color: #87978d; font-size: 8px; }
+.classLoading, .classEmpty, .classError {
+  padding: 30px 18px;
+  border: 1px solid #e2eae3;
+  border-radius: 9px;
+  background: #fff;
+  color: #809087;
+  font-size: 10px;
+  text-align: center;
+}
+.classError { color: #a33d34; border-color: #f0d6d2; background: #fff7f5; }
+.backActions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.classBack {
+  padding: 9px 12px;
+  border: 1px solid #dfe7e1;
+  border-radius: 5px;
+  color: #466a5c;
+  font-size: 8px;
+  font-weight: 800;
+}
+.rosterPanel {
+  margin-top: 24px;
+  padding: 23px;
+  border: 1px solid #e0e9e1;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 8px 26px rgba(18,55,40,.035);
+}
+.rosterTools {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.rosterSearch {
+  width: min(320px, 100%);
+  min-height: 39px;
+  padding: 0 12px;
+  border: 1px solid #dfe7e1;
+  border-radius: 6px;
+  outline: none;
+  background: #fbfcfa;
+  color: #173a31;
+  font: inherit;
+  font-size: 10px;
+}
+.rosterSearch:focus { border-color: #4baf89; box-shadow: 0 0 0 3px rgba(75,175,137,.12); }
+.rosterTableWrap { width: 100%; overflow-x: auto; }
+.rosterTable { width: 100%; border-collapse: collapse; white-space: nowrap; }
+.rosterTable th {
+  padding: 11px 10px;
+  border-bottom: 1px solid #e5ece6;
+  color: #94a198;
+  text-align: left;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+.rosterTable td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #eef2ee;
+  color: #536b60;
+  font-size: 9px;
+}
+.rosterName { color: #173a31 !important; font-weight: 800; }
+.rosterIndex { color: #a1ada5 !important; width: 42px; }
+.rosterStatus {
+  display: inline-flex;
+  padding: 5px 8px;
+  border-radius: 30px;
+  font-size: 7px;
+  font-weight: 900;
+}
+.rosterActive { background: #e8f6ed; color: #16775b; }
+.rosterInactive { background: #fff0ed; color: #a23f35; }
+.rosterFooter {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  color: #91a097;
+  font-size: 8px;
+}
+@media (max-width: 900px) {
+  .classGrid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 600px) {
+  .classPageIntro { display: block; }
+  .classSummary { margin-top: 18px; }
+  .classGrid { grid-template-columns: 1fr; }
+  .classCard { min-height: 190px; }
+  .rosterPanel { padding: 16px; }
+  .rosterTools { align-items: stretch; flex-direction: column; }
+  .rosterSearch { width: 100%; }
+}
