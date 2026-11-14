@@ -139,3 +139,26 @@
   font-size: 19px;
   letter-spacing: -.04em;
 }
+
+
+.markInputGroup { display: grid; gap: 5px; justify-items: start; }
+.gradePill {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 54px; padding: 4px 7px; border-radius: 20px;
+  background: #edf3ef; color: #4b6c5c;
+  font-size: 7px; font-weight: 900; letter-spacing: .06em;
+}
+.gradeT { background: #fff1dc; color: #93631f; }
+.gradeX { background: #f0edf7; color: #70538f; }
+.gradeScale {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  margin-top: 13px; padding: 12px;
+  border: 1px solid #e5ece6; border-radius: 7px; background: #fafcf9;
+}
+.gradeScale strong {
+  margin-right: 3px; color: #527061; font-size: 7px; font-weight: 900; letter-spacing: .09em;
+}
+.gradeScale span {
+  padding: 5px 7px; border: 1px solid #e5ece6; border-radius: 4px;
+  background: #fff; color: #527061; font-size: 7px; font-weight: 800;
+}
