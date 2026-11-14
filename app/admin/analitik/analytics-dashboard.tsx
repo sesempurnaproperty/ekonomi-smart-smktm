@@ -250,6 +250,7 @@ export default function AnalyticsDashboard() {
               </table>
             </div>
             <p className={styles.sectionNote} style={{ marginTop: 14, marginBottom: 8 }}>Perkembangan mengikut kelas</p>
+            <div className={styles.tableScroll} style={{ marginTop: 14 }}>
               <table className={styles.analyticsTable}><thead><tr><th>KELAS</th><th>PURATA PPT</th><th>PURATA PAT</th><th>PERUBAHAN</th><th>MENINGKAT</th><th>MEROSOT</th><th>BERPASANGAN</th></tr></thead>
                 <tbody>{classSummaries.map(({ item, group }) => {
                   const entries = group.map(getProgress).filter((entry) => entry.delta !== null);
