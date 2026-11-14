@@ -209,6 +209,7 @@ Deno.serve(async (req: Request) => {
         getProfileRows(supabaseUrl, secretKey, {
           select: "academic_class_id,is_active",
           role: "eq.student",
+          is_active: "eq.true",
           limit: "1000"
         })
       ]);
@@ -262,6 +263,7 @@ Deno.serve(async (req: Request) => {
         select: "user_id,username,full_name,form_level,class_name,is_active,academic_class_id",
         role: "eq.student",
         academic_class_id: "eq." + classId,
+        is_active: "eq.true",
         order: "full_name.asc",
         limit: "500"
       });
@@ -379,7 +381,7 @@ Deno.serve(async (req: Request) => {
       }
       const [profileRows, classRows] = await Promise.all([
         getProfileRows(supabaseUrl, secretKey, {
-          select: "user_id,role",
+          select: "user_id,role,is_active",
           user_id: "eq." + userId,
           limit: "1"
         }),
@@ -392,6 +394,7 @@ Deno.serve(async (req: Request) => {
       const student = Array.isArray(profileRows) ? profileRows[0] : null;
       const targetClass = Array.isArray(classRows) ? classRows[0] : null;
       if (!student || student.role !== "student") return response({ error: "Rekod murid tidak ditemui." }, 404, origin);
+      if (student.is_active !== true) return response({ error: "Akaun murid telah dinyahaktifkan kerana tidak lagi bersekolah di sini. Aktifkan semula hanya jika rekod dipulihkan." }, 409, origin);
       if (!targetClass || targetClass.is_active !== true) return response({ error: "Kelas sasaran tidak aktif atau tidak ditemui." }, 404, origin);
       const url = new URL("/rest/v1/user_profiles", supabaseUrl);
       url.searchParams.set("user_id", "eq." + userId);
@@ -422,6 +425,7 @@ Deno.serve(async (req: Request) => {
         getProfileRows(supabaseUrl, secretKey, {
           select: "user_id,academic_class_id,is_active",
           role: "eq.student",
+          is_active: "eq.true",
           limit: "1000"
         }),
         getTableRows(supabaseUrl, secretKey, "student_assessment_marks", {
@@ -489,6 +493,7 @@ Deno.serve(async (req: Request) => {
           select: "user_id,username,full_name,form_level,class_name,is_active,academic_class_id",
           role: "eq.student",
           academic_class_id: "eq." + classId,
+          is_active: "eq.true",
           order: "full_name.asc",
           limit: "500"
         }),
@@ -578,12 +583,13 @@ Deno.serve(async (req: Request) => {
       if (!uuidPattern.test(studentId) || !marks) return response({ error: "Maklumat murid atau markah tidak sah." }, 400, origin);
 
       const studentRows = await getProfileRows(supabaseUrl, secretKey, {
-        select: "user_id,role",
+        select: "user_id,role,is_active",
         user_id: "eq." + studentId,
         limit: "1"
       });
       const student = Array.isArray(studentRows) ? studentRows[0] : null;
       if (!student || student.role !== "student") return response({ error: "Rekod murid tidak ditemui." }, 404, origin);
+      if (student.is_active !== true) return response({ error: "Akaun murid telah dinyahaktifkan dan tidak boleh menerima kemas kini markah." }, 409, origin);
 
       const assessmentRows = await getTableRows(supabaseUrl, secretKey, "assessment_catalog", {
         select: "code,max_score,is_active",
@@ -671,6 +677,7 @@ Deno.serve(async (req: Request) => {
           select: "user_id,username,full_name",
           role: "eq.student",
           academic_class_id: "eq." + classId,
+          is_active: "eq.true",
           limit: "500"
         }),
         getTableRows(supabaseUrl, secretKey, "assessment_catalog", {
