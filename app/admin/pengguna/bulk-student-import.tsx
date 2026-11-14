@@ -56,6 +56,39 @@ function parseFormLevel(value: string): number {
   return match ? Number(match[1]) : Number.NaN;
 }
 
+async function getActiveClassKeys(): Promise<Set<string>> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!supabaseUrl || !publishableKey) throw new Error("Konfigurasi Supabase belum lengkap.");
+
+  const supabase = createClient();
+  const { data, error } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (error || !token) throw new Error("Sesi pentadbir tamat. Sila log masuk semula.");
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/admin-user-management`, {
+    method: "POST",
+    headers: {
+      apikey: publishableKey,
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ action: "list_classes" }),
+    cache: "no-store"
+  });
+  const result = (await response.json()) as {
+    classes?: Array<{ form_level: number; class_name: string; is_active: boolean }>;
+    error?: string;
+  };
+  if (!response.ok) throw new Error(result.error ?? "Senarai kelas gagal dimuatkan untuk semakan import.");
+
+  return new Set(
+    (result.classes ?? [])
+      .filter((item) => item.is_active)
+      .map((item) => `${item.form_level}::${item.class_name.trim().toLowerCase()}`)
+  );
+}
+
 export default function BulkStudentImport({
   onImported
 }: {
@@ -198,6 +231,14 @@ export default function BulkStudentImport({
 
       if (rows.length === 0) throw new Error("Tiada rekod murid diisi dalam fail.");
       if (rows.length > 100) throw new Error("Maksimum 100 rekod bagi satu import. Pecahkan fail kepada beberapa batch.");
+
+      const activeClassKeys = await getActiveClassKeys();
+      rows.forEach((row) => {
+        const classKey = `${row.form_level}::${row.class_name.trim().toLowerCase()}`;
+        if (!activeClassKeys.has(classKey)) {
+          row.errors.push("Kelas belum didaftarkan atau tidak aktif dalam Modul Pengurusan Kelas.");
+        }
+      });
 
       const usernameCounts = new Map<string, number>();
       rows.forEach((row) => usernameCounts.set(row.username, (usernameCounts.get(row.username) ?? 0) + 1));
