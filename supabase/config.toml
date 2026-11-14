@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.portal-username-login]
 verify_jwt = false
+
+[functions.admin-user-management]
+verify_jwt = false
