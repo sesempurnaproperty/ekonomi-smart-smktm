@@ -1123,6 +1123,72 @@ Deno.serve(async (req: Request) => {
       return response({ message: "Status akaun dikemaskini." }, 200, origin);
     }
 
+    if (action === "analytics_dashboard") {
+      const [classRows, studentRows, markRows, assessmentRows] = await Promise.all([
+        getClassRows(supabaseUrl, secretKey, {
+          select: "id,form_level,class_name,is_active",
+          order: "form_level.asc,class_name.asc",
+          limit: "500"
+        }),
+        getProfileRows(supabaseUrl, secretKey, {
+          select: "user_id,full_name,role,form_level,class_name,academic_class_id,is_active",
+          role: "eq.student",
+          is_active: "eq.true",
+          order: "form_level.asc,class_name.asc,full_name.asc",
+          limit: "2000"
+        }),
+        getTableRows(supabaseUrl, secretKey, "student_assessment_marks", {
+          select: "student_id,assessment_code,score,mark_status,updated_at",
+          limit: "10000"
+        }),
+        getTableRows(supabaseUrl, secretKey, "assessment_catalog", {
+          select: "code,title,max_score,is_active",
+          order: "code.asc",
+          limit: "100"
+        })
+      ]);
+
+      const activeStudents = (Array.isArray(studentRows) ? studentRows : [])
+        .filter((student) => student.role === "student" && student.is_active === true);
+      const markMap = new Map<string, Record<string, number | string | null>>();
+      let lastUpdated: string | null = null;
+
+      for (const mark of (Array.isArray(markRows) ? markRows : [])) {
+        if (typeof mark.student_id !== "string" || typeof mark.assessment_code !== "string") continue;
+        const values = markMap.get(mark.student_id) ?? {};
+        if (mark.mark_status === "TH" || mark.mark_status === "X") {
+          values[mark.assessment_code] = mark.mark_status;
+        } else if (mark.score === null || mark.score === undefined) {
+          values[mark.assessment_code] = null;
+        } else {
+          const score = Number(mark.score);
+          values[mark.assessment_code] = Number.isFinite(score) ? score : null;
+        }
+        markMap.set(mark.student_id, values);
+
+        if (typeof mark.updated_at === "string" && (!lastUpdated || mark.updated_at > lastUpdated)) {
+          lastUpdated = mark.updated_at;
+        }
+      }
+
+      const students = activeStudents.map((student) => ({
+        user_id: student.user_id,
+        full_name: student.full_name,
+        form_level: student.form_level,
+        class_name: student.class_name,
+        academic_class_id: student.academic_class_id,
+        marks: markMap.get(student.user_id) ?? {}
+      }));
+
+      return response({
+        students,
+        classes: Array.isArray(classRows) ? classRows : [],
+        assessments: Array.isArray(assessmentRows) ? assessmentRows : [],
+        last_updated: lastUpdated,
+        generated_at: new Date().toISOString()
+      }, 200, origin);
+    }
+
     return response({ error: "Tindakan tidak dikenali." }, 400, origin);
   } catch (error) {
     console.error("Admin user management request failed:", error);
