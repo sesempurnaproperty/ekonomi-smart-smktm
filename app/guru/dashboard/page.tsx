@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "../../../lib/supabase/server";
+import { getCurrentProfile } from "../../../lib/auth/get-current-profile";
 import styles from "../guru.module.css";
 import TeacherLogoutButton from "./logout-button";
 
@@ -32,24 +32,11 @@ const modules = [
 ];
 
 export default async function TeacherDashboardPage() {
-  const supabase = await createClient();
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const authUserId =
-    typeof claimsData?.claims?.sub === "string" ? claimsData.claims.sub : null;
+  const profile = await getCurrentProfile();
 
-  if (!authUserId) {
-    redirect("/guru/login");
-  }
-
-  const { data: teacher, error } = await supabase
-    .from("teacher_accounts")
-    .select("username, display_name")
-    .eq("user_id", authUserId)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (error || !teacher) {
-    redirect("/guru/login?status=unauthorized");
+  if (!profile) redirect("/login");
+  if (profile.role !== "teacher") {
+    redirect(profile.role === "admin" ? "/admin/dashboard" : "/murid/dashboard");
   }
 
   return (
@@ -71,7 +58,7 @@ export default async function TeacherDashboardPage() {
       <section className={styles.dashboardMain}>
         <span className={styles.dashboardKicker}>PUSAT PENGURUSAN PEMBELAJARAN</span>
         <h1 className={styles.dashboardTitle}>
-          Selamat datang,<br /><em>{teacher.display_name}</em>
+          Selamat datang,<br /><em>{profile.full_name}</em>
         </h1>
         <p className={styles.dashboardIntro}>
           Ini ruang kerja guru EKONOMI SMART SMKTM. Modul akan diaktifkan secara berperingkat.
@@ -80,9 +67,9 @@ export default async function TeacherDashboardPage() {
         <div className={styles.accountCard}>
           <div>
             <small>AKAUN GURU AKTIF</small>
-            <strong>{teacher.display_name}</strong>
+            <strong>{profile.full_name}</strong>
           </div>
-          <span>@{teacher.username}</span>
+          <span>@{profile.username}</span>
         </div>
 
         <div className={styles.dashboardGrid}>
