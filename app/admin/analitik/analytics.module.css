@@ -1,0 +1,61 @@
+ .analyticsWrap { display: grid; gap: 22px; width: 100%; }
+.analyticsToolbar { display:flex; align-items:end; flex-wrap:wrap; gap:12px; padding:18px; border:1px solid #dce5e2; border-radius:18px; background:rgba(255,255,255,.86); }
+.filterField { display:grid; gap:7px; min-width:150px; flex:1; }
+.filterField label { font-size:10px; font-weight:800; letter-spacing:.11em; color:#60736c; }
+.filterField select,.searchInput { width:100%; min-height:42px; border:1px solid #d4ded9; border-radius:10px; padding:0 12px; background:#fff; color:#14251f; font:inherit; font-size:13px; outline:none; }
+.filterField select:focus,.searchInput:focus { border-color:#15845f; box-shadow:0 0 0 3px rgba(21,132,95,.12); }
+.toolbarActions { display:flex; gap:8px; margin-left:auto; }
+.actionButton { min-height:42px; border:1px solid #cbd8d2; border-radius:10px; background:#fff; padding:0 14px; color:#19382d; font-size:12px; font-weight:800; cursor:pointer; }
+.actionButtonPrimary { background:#123d31; border-color:#123d31; color:#fff; }
+.kpiGrid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.kpiCard { min-width:0; border:1px solid #dfe8e3; border-radius:16px; padding:17px; background:#fff; box-shadow:0 8px 24px rgba(20,52,39,.035); }
+.kpiLabel { display:block; color:#667971; font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+.kpiValue { display:block; margin-top:10px; color:#122e24; font-size:clamp(24px,3vw,34px); line-height:1.05; font-weight:850; letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
+.kpiHint { display:block; margin-top:8px; color:#74847d; font-size:11px; line-height:1.45; }
+.sectionCard { min-width:0; border:1px solid #dfe8e3; border-radius:18px; background:#fff; padding:20px; box-shadow:0 8px 24px rgba(20,52,39,.035); }
+.sectionHeader { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:16px; }
+.sectionEyebrow { display:block; color:#21815f; font-size:10px; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
+.sectionTitle { margin:5px 0 0; color:#142c22; font-size:20px; line-height:1.2; letter-spacing:-.035em; }
+.sectionNote { margin:6px 0 0; color:#718078; font-size:12px; line-height:1.5; }
+.twoColumn { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:16px; }
+.threeColumn { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.tableScroll { width:100%; overflow:auto; }
+.analyticsTable { width:100%; border-collapse:collapse; min-width:620px; }
+.analyticsTable th { padding:10px 9px; background:#f4f8f6; color:#61746b; font-size:10px; font-weight:900; text-align:left; letter-spacing:.08em; white-space:nowrap; }
+.analyticsTable td { padding:11px 9px; border-bottom:1px solid #edf1ee; color:#31453b; font-size:12px; vertical-align:middle; }
+.analyticsTable tr:last-child td { border-bottom:0; }
+.studentName { color:#17362a; font-weight:800; }
+.muted { color:#87948d; }
+.numeric { font-variant-numeric:tabular-nums; white-space:nowrap; }
+.changePositive { color:#14784f !important; font-weight:900; }
+.changeNegative { color:#bd4b3d !important; font-weight:900; }
+.changeNeutral { color:#7a827d !important; font-weight:800; }
+.statusPill { display:inline-flex; align-items:center; border-radius:99px; padding:5px 8px; font-size:10px; font-weight:900; white-space:nowrap; background:#edf3ef; color:#607168; }
+.statusUp { background:#e4f5ec; color:#14784f; }
+.statusDown { background:#fcece8; color:#b44b3e; }
+.statusPending { background:#fff4da; color:#946313; }
+.statusNeutral { background:#eef0f4; color:#687181; }
+.progressCell { min-width:120px; }
+.barTrack { height:8px; width:100%; overflow:hidden; border-radius:99px; background:#edf2ef; }
+.barFill { height:100%; border-radius:99px; background:linear-gradient(90deg,#177b5a,#56b88c); }
+.gradeList { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 16px; }
+.gradeRow { display:grid; grid-template-columns:34px 1fr 28px; align-items:center; gap:8px; }
+.gradeLabel { color:#3f554a; font-size:11px; font-weight:900; }
+.gradeTrack { height:9px; border-radius:99px; background:#eef3f0; overflow:hidden; }
+.gradeFill { height:100%; border-radius:99px; background:#327d61; }
+.gradeCount { color:#56665e; font-size:11px; font-weight:800; text-align:right; font-variant-numeric:tabular-nums; }
+.insightGrid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.insightCard { padding:14px; border-radius:13px; background:#f5f8f6; border:1px solid #e7efea; }
+.insightLabel { display:block; color:#75837b; font-size:10px; font-weight:900; letter-spacing:.09em; }
+.insightValue { display:block; margin-top:6px; color:#19382c; font-size:20px; font-weight:850; font-variant-numeric:tabular-nums; }
+.alertBox { border:1px solid #ecd9a7; border-radius:14px; background:#fff9e9; padding:14px 16px; color:#74581e; font-size:12px; line-height:1.6; }
+.alertBox strong { color:#614510; }
+.infoBox { border:1px solid #dce9e1; border-radius:14px; background:#f4faf6; padding:13px 15px; color:#476252; font-size:12px; line-height:1.6; }
+.searchRow { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.searchInput { max-width:320px; }
+.loadingBox,.errorBox,.emptyBox { padding:22px; border:1px dashed #cfdbd4; border-radius:14px; color:#65766d; background:#fff; font-size:13px; }
+.errorBox { color:#a33c31; border-color:#e8c5c0; background:#fff7f5; }
+.footerNote { color:#7c8a82; font-size:10px; line-height:1.6; }
+@media (max-width:900px) { .kpiGrid { grid-template-columns:repeat(2,minmax(0,1fr)); } .twoColumn { grid-template-columns:1fr; } }
+@media (max-width:600px) { .analyticsToolbar { padding:13px; } .filterField { min-width:calc(50% - 8px); } .toolbarActions { width:100%; margin:0; } .toolbarActions button { flex:1; } .kpiGrid { gap:8px; } .kpiCard { padding:13px; } .kpiValue { font-size:25px; } .sectionCard { padding:15px; } .sectionTitle { font-size:18px; } .gradeList { grid-template-columns:1fr; } .insightGrid { grid-template-columns:1fr; } }
+@media print { .analyticsToolbar,.noPrint { display:none !important; } .sectionCard,.kpiCard { box-shadow:none; break-inside:avoid; } .analyticsWrap { gap:12px; } body { background:#fff !important; } }
