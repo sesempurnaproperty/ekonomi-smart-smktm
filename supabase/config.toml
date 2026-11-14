@@ -1,2 +1,5 @@
 [functions.teacher-username-login]
 verify_jwt = false
+
+[functions.portal-username-login]
+verify_jwt = false
