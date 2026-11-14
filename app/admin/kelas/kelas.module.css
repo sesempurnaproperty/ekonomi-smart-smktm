@@ -211,3 +211,10 @@
   .rosterTools { align-items: stretch; flex-direction: column; }
   .rosterSearch { width: 100%; }
 }
+
+.emptyUsers {
+  padding: 28px 14px;
+  color: #95a199;
+  font-size: 9px;
+  text-align: center;
+}
