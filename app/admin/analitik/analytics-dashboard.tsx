@@ -220,7 +220,17 @@ export default function AnalyticsDashboard() {
           <div className={styles.twoColumn}>
             <section className={styles.sectionCard}>
               <div className={styles.sectionHeader}><div><span className={styles.sectionEyebrow}>PRESTASI MENGIKUT KELAS</span><h2 className={styles.sectionTitle}>Perbandingan kelas</h2><p className={styles.sectionNote}>Purata, kadar lulus dan rekod bagi pentaksiran dipilih.</p></div></div>
-              {classSummaries.length ? <div className={styles.tableScroll}><table className={styles.analyticsTable}><thead><tr><th>KELAS</th><th>MURID</th><th>PURATA</th><th>LULUS</th><th>KADAR LULUS</th></tr></thead><tbody>{classSummaries.map(({ item, summary }) => <tr key={item.id}><td className={styles.studentName}>T{item.form_level} {item.class_name}</td><td className={styles.numeric}>{summary.total}</td><td className={styles.numeric}>{fmt(summary.average)}</td><td className={styles.numeric}>{summary.pass}/{summary.numeric}</td><td className={styles.numeric}>{summary.passRate === null ? "—" : fmt(summary.passRate) + "%"}</td></tr>)}</tbody></table></div> : <div className={styles.emptyBox}>Tiada kelas aktif dalam pilihan.</div>}
+              {classSummaries.length ? <>
+                <div className={styles.classBarList}>
+                  {classSummaries.map(({ item, summary }) => (
+                    <div className={styles.classBarItem} key={item.id}>
+                      <div className={styles.classBarHeading}><span>T{item.form_level} · {item.class_name}</span><strong>{fmt(summary.average)} / {fmt(currentAssessment?.max_score ?? 100, 0)}</strong></div>
+                      <div className={styles.barTrack}><div className={styles.barFill} style={{ width: `${summary.average === null ? 0 : Math.max(0, Math.min(100, summary.average / (currentAssessment?.max_score ?? 100) * 100))}%` }} /></div>
+                    </div>
+                  ))}
+                </div>
+                <div className={styles.tableScroll}><table className={styles.analyticsTable}><thead><tr><th>KELAS</th><th>MURID</th><th>PURATA</th><th>LULUS</th><th>KADAR LULUS</th></tr></thead><tbody>{classSummaries.map(({ item, summary }) => <tr key={item.id}><td className={styles.studentName}>T{item.form_level} {item.class_name}</td><td className={styles.numeric}>{summary.total}</td><td className={styles.numeric}>{fmt(summary.average)}</td><td className={styles.numeric}>{summary.pass}/{summary.numeric}</td><td className={styles.numeric}>{summary.passRate === null ? "—" : fmt(summary.passRate) + "%"}</td></tr>)}</tbody></table></div>
+              </> : <div className={styles.emptyBox}>Tiada kelas aktif dalam pilihan.</div>}
             </section>
 
             <section className={styles.sectionCard}>
