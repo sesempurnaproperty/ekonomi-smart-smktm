@@ -23,6 +23,7 @@ type RequestBody = {
   class_name?: unknown;
   user_id?: unknown;
   is_active?: unknown;
+  rows?: unknown;
 };
 
 function readKeyMap(name: string): string | null {
@@ -253,6 +254,178 @@ Deno.serve(async (req: Request) => {
           is_active: created.is_active
         }
       }, 201, origin);
+    }
+
+
+    if (action === "bulk_create_students") {
+      const rows = Array.isArray(body.rows) ? body.rows : [];
+      if (rows.length < 1 || rows.length > 100) {
+        return response({ error: "Fail mesti mengandungi antara 1 hingga 100 rekod murid." }, 400, origin);
+      }
+
+      const seenUsernames = new Set<string>();
+      const results: Array<Record<string, unknown>> = [];
+
+      for (let index = 0; index < rows.length; index += 1) {
+        const raw = rows[index] as Record<string, unknown>;
+        const rowNumber = Number.isInteger(raw?.row_number) ? Number(raw.row_number) : index + 2;
+        const username = typeof raw?.username === "string" ? raw.username.trim().toLowerCase() : "";
+        const fullName = typeof raw?.full_name === "string" ? raw.full_name.trim() : "";
+        const password = typeof raw?.password === "string" ? raw.password : "";
+        const formLevel = Number(raw?.form_level);
+        const className = typeof raw?.class_name === "string" ? raw.class_name.trim() : "";
+
+        const fail = (message: string) => {
+          results.push({
+            row_number: rowNumber,
+            username: username || "(kosong)",
+            full_name: fullName,
+            success: false,
+            message
+          });
+        };
+
+        if (!isUsername(username)) {
+          fail("Format username tidak sah.");
+          continue;
+        }
+        if (seenUsernames.has(username)) {
+          fail("Username berulang dalam fail import.");
+          continue;
+        }
+        seenUsernames.add(username);
+
+        if (fullName.length < 2 || fullName.length > 150) {
+          fail("Nama penuh mesti antara 2 hingga 150 aksara.");
+          continue;
+        }
+        if (password.length < 8 || password.length > 256) {
+          fail("Password mesti sekurang-kurangnya 8 aksara.");
+          continue;
+        }
+        if (formLevel !== 4 && formLevel !== 5) {
+          fail("Tingkatan mesti 4 atau 5.");
+          continue;
+        }
+        if (className.length < 1 || className.length > 60) {
+          fail("Nama kelas wajib diisi (maksimum 60 aksara).");
+          continue;
+        }
+
+        const existing = await getProfileRows(supabaseUrl, secretKey, {
+          select: "user_id",
+          username: "eq." + username,
+          limit: "1"
+        });
+        if (Array.isArray(existing) && existing.length > 0) {
+          fail("Username sudah wujud dalam sistem.");
+          continue;
+        }
+
+        const authEmail = username.includes("@")
+          ? username
+          : username + "@accounts.ekonomismart.invalid";
+
+        let createAuth: Response;
+        let createdPayload: Record<string, unknown>;
+        try {
+          createAuth = await fetch(new URL("/auth/v1/admin/users", supabaseUrl), {
+            method: "POST",
+            headers: {
+              apikey: secretKey,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              email: authEmail,
+              password,
+              email_confirm: true
+            })
+          });
+          createdPayload = await createAuth.json().catch(() => ({}));
+        } catch {
+          fail("Tidak dapat menghubungi Supabase Auth. Cuba import semula baris ini.");
+          continue;
+        }
+
+        if (!createAuth.ok) {
+          const detail = createdPayload?.msg ?? createdPayload?.message ?? createdPayload?.error_description;
+          if (createAuth.status === 422 || createAuth.status === 409) {
+            fail("Identiti Auth sudah wujud atau tidak diterima. Semak username/e-mel.");
+          } else {
+            console.error("Bulk Auth create failed:", createAuth.status, detail ?? "Unknown error");
+            fail("Supabase Auth gagal mencipta akaun.");
+          }
+          continue;
+        }
+
+        const authId = createdPayload?.id ?? (createdPayload?.user as Record<string, unknown> | undefined)?.id;
+        if (typeof authId !== "string") {
+          fail("Supabase Auth tidak memulangkan ID akaun.");
+          continue;
+        }
+
+        const profilePayload = {
+          user_id: authId,
+          username,
+          full_name: fullName,
+          role: "student",
+          form_level: formLevel,
+          class_name: className,
+          is_active: true
+        };
+
+        let insertProfile: Response;
+        let insertedRows: unknown;
+        try {
+          insertProfile = await fetch(new URL("/rest/v1/user_profiles", supabaseUrl), {
+            method: "POST",
+            headers: {
+              apikey: secretKey,
+              "Content-Type": "application/json",
+              Prefer: "return=representation"
+            },
+            body: JSON.stringify(profilePayload)
+          });
+          insertedRows = await insertProfile.json().catch(() => []);
+        } catch {
+          await fetch(new URL("/auth/v1/admin/users/" + encodeURIComponent(authId), supabaseUrl), {
+            method: "DELETE",
+            headers: { apikey: secretKey }
+          });
+          fail("Profil gagal disimpan. Akaun Auth sementara telah dibatalkan.");
+          continue;
+        }
+
+        if (!insertProfile.ok) {
+          await fetch(new URL("/auth/v1/admin/users/" + encodeURIComponent(authId), supabaseUrl), {
+            method: "DELETE",
+            headers: { apikey: secretKey }
+          });
+          const detail = Array.isArray(insertedRows)
+            ? (insertedRows[0] as Record<string, unknown> | undefined)?.message
+            : (insertedRows as Record<string, unknown> | null)?.message;
+          console.error("Bulk profile insert failed:", insertProfile.status, detail ?? "Unknown error");
+          fail("Profil gagal disimpan; akaun Auth sementara telah dibatalkan.");
+          continue;
+        }
+
+        results.push({
+          row_number: rowNumber,
+          username,
+          full_name: fullName,
+          success: true,
+          message: "Akaun murid berjaya dicipta."
+        });
+      }
+
+      const createdCount = results.filter((item) => item.success === true).length;
+      return response({
+        message: "Import pukal selesai diproses.",
+        total: rows.length,
+        created: createdCount,
+        failed: rows.length - createdCount,
+        results
+      }, 200, origin);
     }
 
     if (action === "set_status") {
