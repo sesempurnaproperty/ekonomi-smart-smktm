@@ -14,6 +14,7 @@ create unique index academic_classes_level_name_unique
 
 alter table public.academic_classes enable row level security;
 revoke all on table public.academic_classes from anon, authenticated;
+grant all on table public.academic_classes to service_role;
 
 alter table public.user_profiles
   add column if not exists academic_class_id uuid
