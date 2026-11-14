@@ -18,7 +18,7 @@ type Student = {
   form_level: number;
   class_name: string;
   is_active: boolean;
-  marks: Partial<Record<MarkCode, number | null>>;
+  marks: Partial<Record<MarkCode, number | string | null>>;
 };
 type ApiResponse = {
   class?: { id: string; form_level: number; class_name: string; is_active: boolean };
@@ -77,8 +77,34 @@ function normalizeHeader(value: unknown): string {
 function cellText(value: unknown): string {
   return value === null || value === undefined ? "" : String(value).trim();
 }
-function scoreText(value: number | null | undefined): string {
+function scoreText(value: number | string | null | undefined): string {
   return value === null || value === undefined ? "" : String(value);
+}
+
+function gradeFor(rawValue: string): string {
+  const raw = rawValue.trim().toUpperCase();
+  if (!raw) return "—";
+  if (raw === "TH") return "T";
+  if (raw === "X") return "x";
+  const score = Number(raw);
+  if (!Number.isFinite(score)) return "—";
+  if (score >= 90) return "A+";
+  if (score >= 80) return "A";
+  if (score >= 70) return "A-";
+  if (score >= 65) return "B+";
+  if (score >= 60) return "B";
+  if (score >= 55) return "C+";
+  if (score >= 50) return "C";
+  if (score >= 45) return "D";
+  if (score >= 40) return "E";
+  return "G";
+}
+
+function validMarkValue(rawValue: string, maximum: number): boolean {
+  const raw = rawValue.trim().toUpperCase();
+  if (raw === "TH" || raw === "X" || raw === "") return true;
+  const score = Number(raw);
+  return Number.isFinite(score) && score >= 0 && score <= maximum;
 }
 
 export default function ClassMarksManager({
@@ -169,23 +195,18 @@ export default function ClassMarksManager({
 
   async function saveStudent(student: Student) {
     const draft = drafts[student.user_id] ?? { PPT2026: "", PAT2026: "" };
-    const marks: Record<MarkCode, number | null> = { PPT2026: null, PAT2026: null };
+    const marks: Record<MarkCode, string | null> = { PPT2026: null, PAT2026: null };
 
     for (const code of ["PPT2026", "PAT2026"] as MarkCode[]) {
-      const raw = draft[code].trim();
-      if (raw === "") {
-        marks[code] = null;
-        continue;
-      }
-      const value = Number(raw);
-      if (!Number.isFinite(value) || value < 0 || value > maximumFor(code)) {
+      const raw = draft[code].trim().toUpperCase();
+      if (raw !== "" && !validMarkValue(raw, maximumFor(code))) {
         setRowMessages((previous) => ({
           ...previous,
-          [student.user_id]: { text: `${code}: masukkan nilai 0 hingga ${maximumFor(code)}.`, ok: false }
+          [student.user_id]: { text: code + ": masukkan 0 hingga " + maximumFor(code) + ", atau TH/X.", ok: false }
         }));
         return;
       }
-      marks[code] = value;
+      marks[code] = raw === "" ? null : raw;
     }
 
     setSavingStudent(student.user_id);
@@ -250,6 +271,9 @@ export default function ClassMarksManager({
       ["Isi markah pada lajur PPT2026 dan/atau PAT2026."],
       ["Lajur kosong tidak mengubah markah sedia ada."],
       ["Nilai markah mestilah antara 0 hingga had maksimum setiap pentaksiran."],
+      ["Murid tidak hadir: isi TH. Sistem memberikan gred T."],
+      ["Kod X juga diterima dan sistem memberikan gred x."],
+      ["Gred angka: 0-39 G, 40-44 E, 45-49 D, 50-54 C, 55-59 C+, 60-64 B, 65-69 B+, 70-79 A-, 80-89 A, 90 ke atas A+."],
       ["Jangan ubah username kerana sistem menggunakannya untuk padanan rekod murid."],
       ["Jangan tambah password. Fail ini tidak memerlukan password."]
     ]);
@@ -320,9 +344,8 @@ export default function ClassMarksManager({
 
         for (const [code, rawScore] of [["PPT2026", ppt], ["PAT2026", pat]] as Array<[MarkCode, string]>) {
           if (rawScore === "") continue;
-          const score = Number(rawScore);
-          if (!Number.isFinite(score) || score < 0 || score > maximumFor(code)) {
-            errors.push(`${code}: markah mesti antara 0 hingga ${maximumFor(code)}.`);
+          if (!validMarkValue(rawScore, maximumFor(code))) {
+            errors.push(code + ": markah mesti antara 0 hingga " + maximumFor(code) + ", atau TH/X.");
           }
         }
         if (ppt === "" && pat === "") errors.push("Tiada markah diisi untuk rekod ini.");
@@ -437,8 +460,8 @@ export default function ClassMarksManager({
                 <tr>
                   <th>BIL.</th>
                   <th>NAMA MURID / USERNAME</th>
-                  <th>PPT2026 ({maximumFor("PPT2026")})</th>
-                  <th>PAT2026 ({maximumFor("PAT2026")})</th>
+                  <th>PPT2026 / GRED ({maximumFor("PPT2026")})</th>
+                  <th>PAT2026 / GRED ({maximumFor("PAT2026")})</th>
                   <th className="noPrint">TINDAKAN</th>
                 </tr>
               </thead>
@@ -454,10 +477,16 @@ export default function ClassMarksManager({
                         <span>@{student.username}</span>
                       </td>
                       <td>
-                        <input className={styles.markCellInput} type="number" min="0" max={maximumFor("PPT2026")} step="0.01" value={draft.PPT2026} onChange={(event) => changeDraft(student.user_id, "PPT2026", event.target.value)} aria-label={`Markah PPT2026 ${student.full_name}`}/>
+                        <div className={styles.markInputGroup}>
+                          <input className={styles.markCellInput} type="text" inputMode="decimal" placeholder="Markah / TH / X" value={draft.PPT2026} onChange={(event) => changeDraft(student.user_id, "PPT2026", event.target.value.toUpperCase())} aria-label={`Markah PPT2026 ${student.full_name}`}/>
+                          <span className={`${styles.gradePill} ${draft.PPT2026.trim().toUpperCase() === "TH" ? styles.gradeT : draft.PPT2026.trim().toUpperCase() === "X" ? styles.gradeX : ""}`}>GRED {gradeFor(draft.PPT2026)}</span>
+                        </div>
                       </td>
                       <td>
-                        <input className={styles.markCellInput} type="number" min="0" max={maximumFor("PAT2026")} step="0.01" value={draft.PAT2026} onChange={(event) => changeDraft(student.user_id, "PAT2026", event.target.value)} aria-label={`Markah PAT2026 ${student.full_name}`}/>
+                        <div className={styles.markInputGroup}>
+                          <input className={styles.markCellInput} type="text" inputMode="decimal" placeholder="Markah / TH / X" value={draft.PAT2026} onChange={(event) => changeDraft(student.user_id, "PAT2026", event.target.value.toUpperCase())} aria-label={`Markah PAT2026 ${student.full_name}`}/>
+                          <span className={`${styles.gradePill} ${draft.PAT2026.trim().toUpperCase() === "TH" ? styles.gradeT : draft.PAT2026.trim().toUpperCase() === "X" ? styles.gradeX : ""}`}>GRED {gradeFor(draft.PAT2026)}</span>
+                        </div>
                       </td>
                       <td className="noPrint">
                         <button className={styles.markSaveButton} type="button" disabled={savingStudent === student.user_id} onClick={() => void saveStudent(student)}>
@@ -473,7 +502,11 @@ export default function ClassMarksManager({
             </table>
           </div>
         )}
-        <p className={styles.markFootnote}>Kosongkan satu medan dan tekan SIMPAN untuk mengosongkan rekod markah peperiksaan tersebut. Nilai 0 ialah markah sah dan berbeza daripada medan kosong.</p>
+        <p className={styles.markFootnote}>Masukkan angka, TH (tidak hadir) atau X. Gred dikira secara automatik. Kosongkan medan dan tekan SIMPAN untuk memadam rekod markah peperiksaan tersebut; nilai 0 ialah markah sah dan berbeza daripada medan kosong.</p>
+        <div className={styles.gradeScale}>
+          <strong>JULAT GRED</strong>
+          <span>0–39 G</span><span>40–44 E</span><span>45–49 D</span><span>50–54 C</span><span>55–59 C+</span><span>60–64 B</span><span>65–69 B+</span><span>70–79 A-</span><span>80–89 A</span><span>90 ke atas A+</span><span>TH = T</span><span>X = x</span>
+        </div>
       </section>
 
       <section className={styles.markImportBox}>
@@ -496,7 +529,7 @@ export default function ClassMarksManager({
             </div>
             <div className={styles.markPreviewWrap}>
               <table className={styles.markPreviewTable}>
-                <thead><tr><th>BARIS</th><th>NAMA MURID</th><th>USERNAME</th><th>PPT2026</th><th>PAT2026</th><th>SEMAKAN</th></tr></thead>
+                <thead><tr><th>BARIS</th><th>NAMA MURID</th><th>USERNAME</th><th>PPT2026</th><th>GRED</th><th>PAT2026</th><th>GRED</th><th>SEMAKAN</th></tr></thead>
                 <tbody>
                   {importRows.map((row) => (
                     <tr key={row.row_number}>
@@ -504,7 +537,9 @@ export default function ClassMarksManager({
                       <td>{row.full_name || "—"}</td>
                       <td>@{row.username}</td>
                       <td>{row.PPT2026 || "—"}</td>
+                      <td>{gradeFor(row.PPT2026)}</td>
                       <td>{row.PAT2026 || "—"}</td>
+                      <td>{gradeFor(row.PAT2026)}</td>
                       <td>
                         {row.errors.length === 0 ? <span className={styles.markValid}>LULUS</span> :
                           <span className={styles.markInvalid}>{row.errors.join(" ")}</span>}
