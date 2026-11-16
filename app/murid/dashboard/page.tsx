@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 const studentModules = [
-  { number: "01", title: "Nota dan bahan pembelajaran", description: "Akses nota, PDF, video dan pautan Ekonomi mengikut bab.", href: "/murid/pembelajaran", status: "BUKA PERPUSTAKAAN BAHAN →" },
+  { number: "01", title: "Nota dan bahan pembelajaran", description: "Akses semua nota, PDF, video dan pautan Ekonomi Tingkatan 4 dan Tingkatan 5.", href: "/murid/pembelajaran", status: "BUKA PERPUSTAKAAN BAHAN →" },
   { number: "02", title: "Video dan penerangan", description: "Kandungan visual untuk membantu kefahaman.", href: null, status: "AKAN DATANG" },
   { number: "03", title: "Latihan dan kuiz", description: "Uji kefahaman dan semak pencapaian.", href: null, status: "AKAN DATANG" }
 ];
