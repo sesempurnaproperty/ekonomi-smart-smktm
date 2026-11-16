@@ -46,7 +46,7 @@ export default function StudentLearningLibrary({ formLevel, className }: Student
     setError("");
     const [chapterResult, materialResult] = await Promise.all([
       supabase.from("learning_chapters").select("id,form_level,chapter_number,title,description")
-        .eq("form_level", formLevel).eq("is_active", true).order("chapter_number"),
+        .eq("is_active", true).order("form_level").order("chapter_number"),
       supabase.from("learning_materials").select("id,chapter_id,title,description,material_type,content,resource_url,storage_path,display_order,created_at")
         .eq("is_published", true).order("display_order").order("created_at", { ascending: false })
     ]);
@@ -107,7 +107,7 @@ export default function StudentLearningLibrary({ formLevel, className }: Student
           <span><strong>EKONOMI SMART</strong><small>PERPUSTAKAAN BAHAN PEMBELAJARAN</small></span>
         </Link>
         <div className={styles.topActions}>
-          <span className={styles.roleBadge}>TINGKATAN {formLevel ?? "—"}</span>
+          <span className={styles.roleBadge}>AKSES TINGKATAN 4 &amp; 5</span>
           <Link className={styles.backLink} href="/murid/dashboard">Dashboard</Link>
         </div>
       </header>
@@ -116,14 +116,14 @@ export default function StudentLearningLibrary({ formLevel, className }: Student
         <div className={styles.hero}>
           <span className={styles.eyebrow}>RUANG PEMBELAJARAN MURID</span>
           <h1>Bahan pembelajaran Ekonomi</h1>
-          <p>{formLevel ? "Tingkatan " + formLevel : "Akaun murid"}{className ? " · " + className : ""} — pilih bab untuk mengakses nota, PDF, video dan pautan yang telah diterbitkan oleh guru.</p>
+          <p>{formLevel ? "Tingkatan " + formLevel : "Akaun murid"}{className ? " · " + className : ""} — anda boleh mengakses semua nota, PDF, video dan pautan yang telah diterbitkan untuk Tingkatan 4 dan Tingkatan 5.</p>
         </div>
 
         <div className={styles.studentToolbar}>
           <label>Tapisan bab
             <select value={selectedChapter} onChange={(event) => setSelectedChapter(event.target.value)}>
               <option value="all">Semua bab</option>
-              {chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>Bab {chapter.chapter_number}: {chapter.title}</option>)}
+              {chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>Tingkatan {chapter.form_level} · Bab {chapter.chapter_number}: {chapter.title}</option>)}
             </select>
           </label>
           <button type="button" className={styles.secondaryButton} onClick={() => void refresh()} disabled={loading}>{loading ? "Memuatkan..." : "Muat semula bahan"}</button>
@@ -131,7 +131,7 @@ export default function StudentLearningLibrary({ formLevel, className }: Student
 
         {error ? <div className={styles.errorBox}>{error}</div> : null}
         {loading ? <div className={styles.emptyState}>Sedang mendapatkan bahan pembelajaran untuk akaun anda...</div> : null}
-        {!loading && !error && chapters.length === 0 ? <div className={styles.emptyState}>Belum ada bab pembelajaran diterbitkan untuk tingkatan anda. Sila semak semula selepas guru menambah kandungan.</div> : null}
+        {!loading && !error && chapters.length === 0 ? <div className={styles.emptyState}>Belum ada bab pembelajaran yang diterbitkan. Sila semak semula selepas guru menambah kandungan.</div> : null}
         {!loading && !error && chapters.length > 0 && visibleMaterials.length === 0 ? <div className={styles.emptyState}>Tiada bahan diterbitkan bagi pilihan ini. Pilih bab lain atau semak semula kemudian.</div> : null}
 
         {!loading && visibleMaterials.length > 0 ? (
@@ -142,10 +142,10 @@ export default function StudentLearningLibrary({ formLevel, className }: Student
               return (
                 <article className={styles.studentMaterialCard} key={material.id}>
                   <div className={styles.materialMeta}><span>{material.material_type === "note" ? "NOTA" : material.material_type === "pdf" ? "PDF" : material.material_type === "video" ? "VIDEO" : "PAUTAN LUAR"}</span>
-                    <span> BAB {chapter?.chapter_number ?? "—"}</span></div>
+                    <span>TINGKATAN {chapter?.form_level ?? "—"} · BAB {chapter?.chapter_number ?? "—"}</span></div>
                   <h2>{material.title}</h2>
                   {material.description ? <p>{material.description}</p> : null}
-                  <small className={styles.chapterLabel}>{chapter ? "Bab " + chapter.chapter_number + ": " + chapter.title : ""}</small>
+                  <small className={styles.chapterLabel}>{chapter ? "Tingkatan " + chapter.form_level + " · Bab " + chapter.chapter_number + ": " + chapter.title : ""}</small>
                   {material.material_type === "note" ? (
                     <div className={styles.noteContent}>
                       {expanded ? <div className={styles.noteText}>{material.content}</div> : null}
@@ -162,7 +162,7 @@ export default function StudentLearningLibrary({ formLevel, className }: Student
           </div>
         ) : null}
 
-        <p className={styles.privacyNote}>Paparan ini hanya memaparkan bahan yang diterbitkan untuk Tingkatan {formLevel ?? "anda"}. Bahan draf dan bahan tingkatan lain tidak dipaparkan.</p>
+        <p className={styles.privacyNote}>Semua murid Tingkatan 4 dan Tingkatan 5 boleh mengakses bahan yang telah diterbitkan untuk kedua-dua tingkatan. Bahan draf dan bab tidak aktif kekal tersembunyi.</p>
       </section>
     </main>
   );
