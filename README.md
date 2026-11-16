@@ -52,7 +52,7 @@ Role tidak dipilih pada halaman login dan pengguna tidak boleh menukar role send
 - Guru dan pentadbir boleh mendaftarkan bab Ekonomi mengikut Tingkatan 4 atau Tingkatan 5.
 - Setiap bab boleh memuatkan nota teks, fail PDF, pautan video atau pautan luar.
 - Guru boleh mengedit bahan, menyimpan sebagai draf atau menerbitkannya kepada murid.
-- Murid hanya boleh membaca bahan yang diterbitkan dan sepadan dengan tingkatan akaun mereka.
+- Murid aktif Tingkatan 4 dan Tingkatan 5 boleh membaca semua bahan yang diterbitkan untuk kedua-dua tingkatan.
 - Fail PDF menggunakan private bucket `learning-materials`, had 20 MB dan pautan tandatangan sementara; URL fail tidak didedahkan secara awam.
 - Semua polisi akses dikawal menggunakan Row Level Security pada jadual dan objek Storage.
 
