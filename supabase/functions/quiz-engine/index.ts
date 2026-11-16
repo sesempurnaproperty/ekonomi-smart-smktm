@@ -245,8 +245,15 @@ async function startAttempt(
     attempt = created[0];
   }
 
+  const draftResponses = await getRows(supabaseUrl, secretKey, "quiz_responses", {
+    select: "question_id,selected_option_id,response_text",
+    attempt_id: "eq." + String(attempt.id),
+    limit: "500"
+  });
+
   return {
     attempt,
+    draft_responses: draftResponses,
     quiz: {
       id: quiz.id,
       title: quiz.title,
@@ -259,6 +266,61 @@ async function startAttempt(
       options: options.filter((o) => o.question_id === q.id)
     }))
   };
+}
+
+async function saveDraftResponse(
+  supabaseUrl: string,
+  secretKey: string,
+  attemptId: string,
+  questionId: string,
+  userId: string,
+  selectedOptionId: string | null,
+  responseText: string | null
+) {
+  const attempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
+    select: "id,quiz_id,status",
+    id: "eq." + attemptId,
+    student_id: "eq." + userId,
+    status: "eq.in_progress",
+    limit: "1"
+  });
+  const attempt = attempts[0];
+  if (!attempt) return { error: "Percubaan tidak aktif atau bukan milik akaun anda.", status: 403 };
+
+  const questions = await getRows(supabaseUrl, secretKey, "quiz_questions", {
+    select: "id,quiz_id,question_type",
+    id: "eq." + questionId,
+    quiz_id: "eq." + String(attempt.quiz_id),
+    limit: "1"
+  });
+  const question = questions[0];
+  if (!question) return { error: "Soalan tidak sepadan dengan percubaan ini.", status: 400 };
+
+  if (question.question_type === "objective") {
+    if (selectedOptionId) {
+      const options = await getRows(supabaseUrl, secretKey, "quiz_options", {
+        select: "id",
+        id: "eq." + selectedOptionId,
+        question_id: "eq." + questionId,
+        limit: "1"
+      });
+      if (!options.length) return { error: "Pilihan jawapan tidak sah.", status: 400 };
+    }
+    responseText = null;
+  } else {
+    selectedOptionId = null;
+    responseText = typeof responseText === "string" ? responseText.slice(0, 12000) : "";
+  }
+
+  await insertRows(supabaseUrl, secretKey, "quiz_responses", [{
+    attempt_id: attemptId,
+    question_id: questionId,
+    selected_option_id: selectedOptionId,
+    response_text: responseText,
+    auto_score: null,
+    teacher_score: null
+  }], "attempt_id,question_id");
+  return { saved: true };
 }
 
 async function submitAttempt(
@@ -554,6 +616,14 @@ Deno.serve(async (req: Request) => {
       if (profile.role !== "student") return send({ error: "Tindakan ini khusus untuk murid." }, 403, origin);
       if (typeof body.quiz_id !== "string") return send({ error: "ID kuiz tidak sah." }, 400, origin);
       result = await startAttempt(supabaseUrl, secretKey, body.quiz_id, callerId, profile);
+    } else if (action === "save_draft_response") {
+      if (profile.role !== "student") return send({ error: "Tindakan ini khusus untuk murid." }, 403, origin);
+      if (typeof body.attempt_id !== "string" || typeof body.question_id !== "string") return send({ error: "ID percubaan atau soalan tidak sah." }, 400, origin);
+      result = await saveDraftResponse(
+        supabaseUrl, secretKey, body.attempt_id, body.question_id, callerId,
+        typeof body.selected_option_id === "string" ? body.selected_option_id : null,
+        typeof body.response_text === "string" ? body.response_text : null
+      );
     } else if (action === "submit_attempt") {
       if (profile.role !== "student") return send({ error: "Tindakan ini khusus untuk murid." }, 403, origin);
       if (typeof body.attempt_id !== "string") return send({ error: "ID percubaan tidak sah." }, 400, origin);
@@ -595,6 +665,12 @@ Deno.serve(async (req: Request) => {
         id: "in.(" + questionIds.join(",") + ")",
         limit: "1000"
       }) : [];
+      const answerKeyRows = questionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_answer_keys", {
+        select: "question_id,marking_guide",
+        question_id: "in.(" + questionIds.join(",") + ")",
+        limit: "1000"
+      }) : [];
+      const guideMap = new Map(answerKeyRows.map((row) => [String(row.question_id), row.marking_guide ?? null]));
       const optionIds = [...new Set(responseRows.map((r) => String(r.selected_option_id ?? "")).filter(Boolean))];
       const optionRows = optionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_options", {
         select: "id,option_code,option_text",
@@ -602,7 +678,10 @@ Deno.serve(async (req: Request) => {
         limit: "1000"
       }) : [];
       const profileMap = new Map(profileRows.map((p) => [String(p.user_id), p]));
-      const questionMap = new Map(questionRows.map((q) => [String(q.id), q]));
+      const questionMap = new Map(questionRows.map((q) => [String(q.id), {
+        ...q,
+        marking_guide: guideMap.get(String(q.id)) ?? null
+      }]));
       const optionMap = new Map(optionRows.map((o) => [String(o.id), o]));
       result = {
         attempts: attemptRows.map((attempt) => ({
