@@ -16,7 +16,7 @@ const adminModules = [
   { number: "03", title: "Rekod markah murid", description: "Kemas kini keputusan PPT2026 dan PAT2026 bagi setiap murid.", href: "/admin/markah", status: "BUKA REKOD MARKAH →" },
   { number: "04", title: "Analitik pencapaian", description: "Rumusan prestasi mengikut tingkatan, kelas dan setiap murid termasuk perkembangan PPT ke PAT.", href: "/admin/analitik", status: "BUKA ANALITIK PENCAPAIAN →" },
   { number: "05", title: "Pengurusan pembelajaran", description: "Urus bab dan terbitkan nota, PDF, video serta pautan untuk murid Tingkatan 4 dan Tingkatan 5.", href: "/admin/pembelajaran", status: "BUKA PERPUSTAKAAN BAHAN →" },
-  { number: "06", title: "Pentaksiran dan kuiz", description: "Sediakan latihan, kuiz dan penilaian murid.", href: null, status: "DALAM PEMBANGUNAN" }
+  { number: "06", title: "Pentaksiran dan kuiz", description: "Bina kuiz objektif dan struktur, terbitkan kepada murid serta semak jawapan.", href: "/admin/kuiz", status: "BUKA PENGURUSAN KUIZ →" }
 ];
 
 export default async function AdminDashboardPage() {

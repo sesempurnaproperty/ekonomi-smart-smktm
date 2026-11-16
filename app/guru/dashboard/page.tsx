@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 const modules = [
   { number: "01", title: "Pengurusan kelas", description: "Urus kelas Ekonomi Tingkatan 4 dan Tingkatan 5.", href: null, status: "DALAM PEMBANGUNAN" },
   { number: "02", title: "Bahan pembelajaran", description: "Susun bab, nota, PDF, video dan pautan mengikut tingkatan.", href: "/guru/pembelajaran", status: "BUKA PERPUSTAKAAN BAHAN →" },
-  { number: "03", title: "Pentaksiran dan kuiz", description: "Sediakan latihan, kuiz dan penilaian murid.", href: null, status: "DALAM PEMBANGUNAN" }
+  { number: "03", title: "Pentaksiran dan kuiz", description: "Bina kuiz objektif dan struktur, semak jawapan serta urus markah murid.", href: "/guru/kuiz", status: "BUKA PENGURUSAN KUIZ →" }
 ];
 
 export default async function TeacherDashboardPage() {

@@ -80,3 +80,20 @@ Buka http://localhost:3000.
 - [x] Dashboard analitik dan prestasi individu murid
 - [ ] Latihan, kuiz dan analisis item soalan
 - [ ] Penjana soalan menggunakan AI
+
+
+## Sistem latihan dan kuiz
+
+- Guru dan pentadbir boleh mencipta kuiz untuk Tingkatan 4, Tingkatan 5 atau kedua-duanya.
+- Soalan objektif menyokong empat pilihan jawapan dan disemak secara automatik oleh Edge Function.
+- Soalan struktur menerima jawapan bertulis dan disimpan untuk semakan serta pemarkahan manual guru.
+- Had percubaan boleh ditetapkan antara satu hingga lima kali.
+- Kuiz hanya boleh dijawab selepas diterbitkan dan tertakluk kepada sasaran tingkatan.
+- Kunci jawapan dan panduan pemarkahan disimpan berasingan dalam jadual terlindung; ia tidak diberikan kepada pelayar murid.
+- Setiap percubaan dan respons disimpan. Status membezakan sedang menjawab, menunggu semakan dan selesai dinilai.
+- Markah akhir dikemas kini selepas semua jawapan struktur selesai diberi markah.
+
+Portal:
+- Admin → `/admin/kuiz`
+- Guru → `/guru/kuiz`
+- Murid → `/murid/kuiz`

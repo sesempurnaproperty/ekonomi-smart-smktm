@@ -1,0 +1,3 @@
+import type {Metadata} from "next";import {redirect} from "next/navigation";import {getCurrentProfile} from "../../../lib/auth/get-current-profile";import QuizManager from "../../shared/quiz/quiz-manager";
+export const metadata:Metadata={title:"Pentaksiran dan Kuiz | Ekonomi Smart SMKTM",description:"Pengurusan latihan dan kuiz Ekonomi."};
+export default async function AdminQuizPage(){const p=await getCurrentProfile();if(!p)redirect("/login");if(p.role!=="admin")redirect(p.role==="teacher"?"/guru/kuiz":"/murid/kuiz");return <QuizManager dashboardHref="/admin/dashboard" roleLabel="PENTADBIR"/>;}

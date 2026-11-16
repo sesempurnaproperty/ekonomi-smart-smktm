@@ -13,8 +13,8 @@ export const metadata: Metadata = {
 
 const studentModules = [
   { number: "01", title: "Nota dan bahan pembelajaran", description: "Akses semua nota, PDF, video dan pautan Ekonomi Tingkatan 4 dan Tingkatan 5.", href: "/murid/pembelajaran", status: "BUKA PERPUSTAKAAN BAHAN →" },
-  { number: "02", title: "Video dan penerangan", description: "Kandungan visual untuk membantu kefahaman.", href: null, status: "AKAN DATANG" },
-  { number: "03", title: "Latihan dan kuiz", description: "Uji kefahaman dan semak pencapaian.", href: null, status: "AKAN DATANG" }
+  { number: "02", title: "Latihan dan kuiz", description: "Jawab latihan objektif dan struktur serta semak markah anda.", href: "/murid/kuiz", status: "BUKA LATIHAN DAN KUIZ →" },
+  { number: "03", title: "Video dan penerangan", description: "Kandungan visual untuk membantu kefahaman.", href: null, status: "AKAN DATANG" }
 ];
 
 export default async function StudentDashboardPage() {
