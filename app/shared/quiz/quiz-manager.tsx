@@ -153,20 +153,22 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   setAnnotationDrafts(current=>({...current,[responseId]:(current[responseId]??[]).filter(a=>a.id!==annotationId)}));
  }
 
- async function saveAnnotations(responseId:string){
+ async function grade(r:R){
+  const d=grades[r.id];
+  if(!d?.score.trim()){setError("Masukkan markah.");return;}
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{
-   action:"save_marking_annotations",
-   response_id:responseId,
-   annotations:annotationDrafts[responseId]??[]
+   action:"grade_response",
+   response_id:r.id,
+   teacher_score:Number(d.score),
+   feedback:d.feedback,
+   marking_annotations:annotationDrafts[r.id]??[]
   }});
   setBusy(false);
-  if(err||data?.error){setError(err?.message??data?.error??"Tanda pemarkahan gagal disimpan.");return;}
-  setNotice("Tanda pemarkahan berjaya disimpan. Murid boleh melihat tanda pada perkataan yang telah ditandakan.");
+  if(err||data?.error){setError(err?.message??data?.error??"Pemarkahan gagal disimpan.");return;}
+  setNotice("Markah, ulasan dan tanda pada jawapan berjaya disimpan bersama. Murid boleh melihat tanda selepas memuat semula rekod.");
   await detail();
- }
-
- async function grade(r:R){const d=grades[r.id];if(!d?.score.trim()){setError("Masukkan markah.");return;}setBusy(true);const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"grade_response",response_id:r.id,teacher_score:Number(d.score),feedback:d.feedback}});setBusy(false);if(err||data?.error){setError(err?.message??data?.error??"Markah gagal disimpan.");return;}setNotice("Markah struktur disimpan.");await detail();}
+ }}
  return <main className={styles.pageShell}><header className={styles.topBar}><Link className={styles.brand} href={dashboardHref}><span className={styles.brandMark}>ES</span><span><strong>EKONOMI SMART</strong><small>PENTAKSIRAN DAN KUIZ</small></span></Link><div className={styles.topActions}><span className={styles.roleBadge}>{roleLabel}</span><Link className={styles.backLink} href={dashboardHref}>Dashboard</Link></div></header>
  <section className={styles.pageContent}><div className={styles.hero}><span className={styles.eyebrow}>PUSAT PENTAKSIRAN DIGITAL</span><h1>Pengurusan latihan dan kuiz</h1><p>Bina soalan objektif dan struktur, terbitkan kuiz serta semak jawapan murid. {roleLabel === "GURU" ? "Senarai skrip dan pemarkahan dihadkan kepada kelas yang dipautkan kepada akaun guru anda." : "Pentadbir boleh melihat dan menyemak semua percubaan murid."}</p></div>{error?<div className={styles.errorBox}>{error}</div>:null}{notice?<div className={styles.noticeBox}>{notice}</div>:null}
  <div className={styles.managerGrid}><section className={styles.panel}><span className={styles.eyebrow}>LANGKAH 1</span><h2>Cipta kuiz</h2><form className={styles.form} onSubmit={createQuiz}>
@@ -237,10 +239,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     <button type="button" aria-label={"Buang tanda "+mark.text} disabled={busy} onClick={()=>removeAnnotation(r.id,mark.id)}>×</button>
    </span>)}
   </div>:null}
-  <button type="button" className={styles.saveAnnotationsButton} disabled={busy} onClick={()=>void saveAnnotations(r.id)}>
-   {busy?"Menyimpan...":"Simpan tanda pemarkahan"}
-  </button>
+  <p className={styles.saveAnnotationsHint}>Semua tanda di atas akan disimpan bersama markah dan ulasan apabila guru menekan <strong>Simpan pemarkahan</strong>.</p>
  </div>
- <div className={styles.gradeForm}><label>Markah<input type="number" min="0" max={r.question?.marks??0} step="0.5" value={grades[r.id]?.score??""} onChange={e=>setGrades(x=>({...x,[r.id]:{score:e.target.value,feedback:x[r.id]?.feedback??""}}))}/></label><label>Ulasan guru<input value={grades[r.id]?.feedback??""} onChange={e=>setGrades(x=>({...x,[r.id]:{score:x[r.id]?.score??"",feedback:e.target.value}}))}/></label><button className={styles.secondaryButton} type="button" disabled={busy} onClick={()=>void grade(r)}>Simpan markah</button></div></>}</article>)}</>:<p className={styles.emptyText}>Pilih percubaan murid.</p>}</div></div>}</section></>:null}
+ <div className={styles.gradeForm}><label>Markah<input type="number" min="0" max={r.question?.marks??0} step="0.5" value={grades[r.id]?.score??""} onChange={e=>setGrades(x=>({...x,[r.id]:{score:e.target.value,feedback:x[r.id]?.feedback??""}}))}/></label><label>Ulasan guru<input value={grades[r.id]?.feedback??""} onChange={e=>setGrades(x=>({...x,[r.id]:{score:x[r.id]?.score??"",feedback:e.target.value}}))}/></label><button className={styles.secondaryButton} type="button" disabled={busy} onClick={()=>void grade(r)}>{busy?"Menyimpan...":"Simpan pemarkahan"}</button></div></>}</article>)}</>:<p className={styles.emptyText}>Pilih percubaan murid.</p>}</div></div>}</section></>:null}
  </section></main>;
 }
