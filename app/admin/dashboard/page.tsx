@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 const adminModules = [
   { number: "01", title: "Pengurusan pengguna", description: "Daftar guru, tetapkan peranan dan import akaun murid secara pukal.", href: "/admin/pengguna", status: "BUKA PENGURUSAN PENGGUNA →" },
-  { number: "02", title: "Pengurusan kelas", description: "Lihat kad kelas dan senarai murid mengikut Tingkatan 4 dan Tingkatan 5.", href: "/admin/kelas", status: "BUKA DIREKTORI KELAS →" },
+  { number: "02", title: "Pengurusan kelas", description: "Lihat senarai murid dan tetapkan guru penilai bagi setiap kelas Tingkatan 4 dan Tingkatan 5.", href: "/admin/kelas", status: "BUKA DIREKTORI KELAS →" },
   { number: "03", title: "Rekod markah murid", description: "Kemas kini keputusan PPT2026 dan PAT2026 bagi setiap murid.", href: "/admin/markah", status: "BUKA REKOD MARKAH →" },
   { number: "04", title: "Analitik pencapaian", description: "Rumusan prestasi mengikut tingkatan, kelas dan setiap murid termasuk perkembangan PPT ke PAT.", href: "/admin/analitik", status: "BUKA ANALITIK PENCAPAIAN →" },
   { number: "05", title: "Pengurusan pembelajaran", description: "Urus bab dan terbitkan nota, PDF, video serta pautan untuk murid Tingkatan 4 dan Tingkatan 5.", href: "/admin/pembelajaran", status: "BUKA PERPUSTAKAAN BAHAN →" },
