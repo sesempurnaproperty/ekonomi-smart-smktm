@@ -44,6 +44,52 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  async function addQuestion(e:FormEvent){e.preventDefault();if(form.kind==="objective"&&form.options.some(x=>!x.trim())){setError("Lengkapkan empat pilihan jawapan.");return;}setBusy(true);setError("");try{const {data:q,error:qErr}=await s.from("quiz_questions").insert({quiz_id:quizId,question_order:questions.length+1,question_type:form.kind,prompt:form.prompt.trim(),marks:Number(form.marks)}).select("*").single();if(qErr||!q)throw new Error(qErr?.message??"Soalan gagal disimpan.");let correctId:string|null=null;if(form.kind==="objective"){const {data:o,error:oErr}=await s.from("quiz_options").insert(form.options.map((v,i)=>({question_id:q.id,option_code:["A","B","C","D"][i],option_text:v.trim(),option_order:i+1}))).select("*");if(oErr||!o)throw new Error(oErr?.message??"Pilihan gagal disimpan.");correctId=(o as Option[]).find(x=>x.option_code===form.correct)?.id??null;}const {data:k,error:kErr}=await s.functions.invoke("quiz-engine",{body:{action:"save_answer_key",question_id:q.id,correct_option_id:correctId,marking_guide:form.kind==="structured"?form.guide.trim():null}});if(kErr||k?.error){await s.from("quiz_questions").delete().eq("id",q.id);throw new Error(kErr?.message??k?.error??"Kunci jawapan gagal disimpan.");}setForm(fresh);setNotice("Soalan berjaya ditambah.");await detail();}catch(e){setError(e instanceof Error?e.message:"Soalan gagal disimpan.");}finally{setBusy(false);}}
  async function publish(){if(!selected)return;setBusy(true);const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"publish_quiz",quiz_id:selected.id}});setBusy(false);if(err||data?.error){setError(err?.message??data?.error??"Gagal menerbitkan kuiz.");return;}setNotice("Kuiz berjaya diterbitkan.");await refresh();}
  async function unpublish(){if(!selected)return;setBusy(true);const {error:err}=await s.from("learning_quizzes").update({status:"draft"}).eq("id",selected.id);setBusy(false);if(err)setError(err.message);else{setNotice("Kuiz ditarik balik.");await refresh();}}
+ async function resetAttempts(){
+  if(!selected)return;
+  const scopeText=roleLabel==="GURU"?"percubaan murid daripada kelas yang ditugaskan kepada akaun anda":"semua percubaan murid";
+  const ok=window.confirm(
+   "RESET PERCOBAAN KUIZ?\n\nTindakan ini akan memadam "+scopeText+", termasuk jawapan, markah dan ulasan guru. Kuiz akan ditarik balik dan perlu diterbitkan semula. Tindakan ini tidak boleh dibatalkan. Teruskan?"
+  );
+  if(!ok)return;
+  setBusy(true);setError("");setNotice("");
+  const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"reset_quiz_attempts",quiz_id:selected.id}});
+  setBusy(false);
+  if(err||data?.error){setError(err?.message??data?.error??"Reset percubaan gagal.");return;}
+  setNotice(data.message??"Percubaan berjaya direset.");
+  await refresh();
+  await detail();
+ }
+
+ async function removeQuiz(){
+  if(!selected)return;
+  const ok=window.confirm(
+   "PADAM KESELURUHAN KUIZ?\n\nKuiz '"+selected.title+"' akan dipadam bersama semua soalan, pilihan jawapan, kunci jawapan, jawapan murid, markah dan sejarah percubaan yang berkaitan. Tindakan ini kekal dan tidak boleh dibatalkan. Teruskan?"
+  );
+  if(!ok)return;
+  setBusy(true);setError("");setNotice("");
+  const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"delete_quiz",quiz_id:selected.id}});
+  setBusy(false);
+  if(err||data?.error){setError(err?.message??data?.error??"Kuiz gagal dipadam.");return;}
+  setNotice(data.message??"Kuiz berjaya dipadam.");
+  setQuizId("");
+  await refresh();
+ }
+
+ async function removeQuestion(question:Question){
+  const ok=window.confirm(
+   "PADAM SOALAN "+question.question_order+"?\n\nSoalan ini serta pilihan jawapan dan kunci jawapannya akan dipadam. Kuiz mesti berstatus draf dan semua percubaan murid mesti direset terlebih dahulu. Teruskan?"
+  );
+  if(!ok)return;
+  setBusy(true);setError("");setNotice("");
+  const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{
+   action:"delete_question",quiz_id:quizId,question_id:question.id
+  }});
+  setBusy(false);
+  if(err||data?.error){setError(err?.message??data?.error??"Soalan gagal dipadam.");return;}
+  setNotice(data.message??"Soalan berjaya dipadam.");
+  await detail();
+ }
+
  async function grade(r:R){const d=grades[r.id];if(!d?.score.trim()){setError("Masukkan markah.");return;}setBusy(true);const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"grade_response",response_id:r.id,teacher_score:Number(d.score),feedback:d.feedback}});setBusy(false);if(err||data?.error){setError(err?.message??data?.error??"Markah gagal disimpan.");return;}setNotice("Markah struktur disimpan.");await detail();}
  return <main className={styles.pageShell}><header className={styles.topBar}><Link className={styles.brand} href={dashboardHref}><span className={styles.brandMark}>ES</span><span><strong>EKONOMI SMART</strong><small>PENTAKSIRAN DAN KUIZ</small></span></Link><div className={styles.topActions}><span className={styles.roleBadge}>{roleLabel}</span><Link className={styles.backLink} href={dashboardHref}>Dashboard</Link></div></header>
  <section className={styles.pageContent}><div className={styles.hero}><span className={styles.eyebrow}>PUSAT PENTAKSIRAN DIGITAL</span><h1>Pengurusan latihan dan kuiz</h1><p>Bina soalan objektif dan struktur, terbitkan kuiz serta semak jawapan murid. {roleLabel === "GURU" ? "Senarai skrip dan pemarkahan dihadkan kepada kelas yang dipautkan kepada akaun guru anda." : "Pentadbir boleh melihat dan menyemak semua percubaan murid."}</p></div>{error?<div className={styles.errorBox}>{error}</div>:null}{notice?<div className={styles.noticeBox}>{notice}</div>:null}
@@ -53,8 +99,21 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  <label>Had percubaan<select value={qf.limit} onChange={e=>setQf({...qf,limit:e.target.value})}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n} kali</option>)}</select></label>
  <label className={styles.fullWidth}>Bab berkaitan<select value={qf.chapter_id} onChange={e=>setQf({...qf,chapter_id:e.target.value})}><option value="">Tidak dipautkan</option>{chapters.map(c=><option key={c.id} value={c.id}>T{c.form_level} · Bab {c.chapter_number}: {c.title}</option>)}</select></label><button className={styles.primaryButton} disabled={busy||loading}>Cipta kuiz draf</button></form></section>
  <section className={styles.panel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>SENARAI KUIZ</span><h2>Kuiz berdaftar</h2></div><button className={styles.textButton} type="button" onClick={()=>void refresh()}>Muat semula</button></div>{loading?<p className={styles.emptyText}>Memuatkan...</p>:quizzes.length===0?<p className={styles.emptyText}>Belum ada kuiz.</p>:<div className={styles.quizList}>{quizzes.map(q=><button key={q.id} type="button" className={q.id===quizId?styles.quizListItemActive:styles.quizListItem} onClick={()=>setQuizId(q.id)}><span><strong>{q.title}</strong><small>{q.target_form_level?"Tingkatan "+q.target_form_level:"Tingkatan 4 dan 5"} · {q.attempt_limit} percubaan</small></span><span className={q.status==="published"?styles.publishedTag:styles.draftTag}>{q.status==="published"?"DITERBITKAN":"DRAF"}</span></button>)}</div>}</section></div>
- {selected?<><section className={styles.panel+" "+styles.questionPanel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>LANGKAH 2</span><h2>{selected.title}</h2><p className={styles.panelSub}>{selected.target_form_level?"Tingkatan "+selected.target_form_level:"Tingkatan 4 dan 5"}{selected.chapter_id&&chapterMap.get(selected.chapter_id)?" · Bab "+chapterMap.get(selected.chapter_id)?.chapter_number+": "+chapterMap.get(selected.chapter_id)?.title:""}</p></div>{selected.status==="published"?<button className={styles.secondaryButton} type="button" disabled={busy} onClick={()=>void unpublish()}>Tarik balik</button>:<button className={styles.primaryButton} type="button" disabled={busy||!questions.length} onClick={()=>void publish()}>Terbitkan kuiz</button>}</div>
- <div className={styles.questionLayout}><div><h3>Soalan ({questions.length})</h3>{questions.length===0?<p className={styles.emptyText}>Tambahkan soalan untuk membina kuiz.</p>:questions.map(q=><article className={styles.questionCard} key={q.id}><div className={styles.questionMeta}><span>SOALAN {q.question_order}</span><span>{q.question_type==="objective"?"OBJEKTIF":"STRUKTUR"}</span><span>{q.marks} markah</span></div><p>{q.prompt}</p>{q.question_type==="objective"?<ol className={styles.optionList} type="A">{options.filter(o=>o.question_id===q.id).map(o=><li key={o.id}>{o.option_text}</li>)}</ol>:<small>Jawapan struktur — ditanda secara manual.</small>}</article>)}</div>
+ {selected?<><section className={styles.panel+" "+styles.questionPanel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>LANGKAH 2</span><h2>{selected.title}</h2><p className={styles.panelSub}>{selected.target_form_level?"Tingkatan "+selected.target_form_level:"Tingkatan 4 dan 5"}{selected.chapter_id&&chapterMap.get(selected.chapter_id)?" · Bab "+chapterMap.get(selected.chapter_id)?.chapter_number+": "+chapterMap.get(selected.chapter_id)?.title:""}</p></div><div className={styles.quizAdminActions}>
+ {selected.status==="published"
+  ? <button className={styles.secondaryButton} type="button" disabled={busy} onClick={()=>void unpublish()}>Tarik balik</button>
+  : <button className={styles.primaryButton} type="button" disabled={busy||!questions.length} onClick={()=>void publish()}>Terbitkan kuiz</button>}
+ {attempts.length>0
+  ? <button className={styles.resetButton} type="button" disabled={busy} onClick={()=>void resetAttempts()}>{roleLabel==="GURU"?"Reset percubaan kelas saya":"Reset semua percubaan"}</button>
+  : null}
+ <button className={styles.deleteButton} type="button" disabled={busy} onClick={()=>void removeQuiz()}>Padam kuiz</button>
+</div></div>
+ <div className={styles.questionLayout}><div><h3>Soalan ({questions.length})</h3>{questions.length===0?<p className={styles.emptyText}>Tambahkan soalan untuk membina kuiz.</p>:questions.map(q=><article className={styles.questionCard} key={q.id}><div className={styles.questionMeta}><span>SOALAN {q.question_order}</span><span>{q.question_type==="objective"?"OBJEKTIF":"STRUKTUR"}</span><span>{q.marks} markah</span></div><p>{q.prompt}</p>{q.question_type==="objective"?<ol className={styles.optionList} type="A">{options.filter(o=>o.question_id===q.id).map(o=><li key={o.id}>{o.option_text}</li>)}</ol>:<small>Jawapan struktur — ditanda secara manual.</small>}
+ <div className={styles.questionCardActions}>
+  <span>{selected.status==="published"?"Tarik balik kuiz untuk mengubah soalan.":attempts.length>0?"Reset percubaan sebelum memadam soalan.":"Soalan boleh dipadam."}</span>
+  <button className={styles.questionDeleteButton} type="button" disabled={busy||selected.status==="published"} onClick={()=>void removeQuestion(q)}>Padam soalan</button>
+ </div>
+</article>)}</div>
  <div className={styles.addQuestionBox}><h3>Tambah soalan</h3><form className={styles.form} onSubmit={addQuestion}><label>Jenis<select value={form.kind} onChange={e=>setForm({...form,kind:e.target.value as "objective"|"structured"})}><option value="objective">Objektif automatik</option><option value="structured">Struktur manual</option></select></label><label>Markah<input type="number" min="0.5" step="0.5" value={form.marks} onChange={e=>setForm({...form,marks:e.target.value})}/></label><label className={styles.fullWidth}>Pernyataan soalan<textarea required rows={4} value={form.prompt} onChange={e=>setForm({...form,prompt:e.target.value})}/></label>{form.kind==="objective"?<>{form.options.map((v,i)=><label key={i}>Pilihan {["A","B","C","D"][i]}<input required value={v} onChange={e=>setForm(x=>({...x,options:x.options.map((o,j)=>i===j?e.target.value:o)}))}/></label>)}<label className={styles.fullWidth}>Jawapan betul<select value={form.correct} onChange={e=>setForm({...form,correct:e.target.value})}>{["A","B","C","D"].map(x=><option key={x}>{x}</option>)}</select></label></>:<label className={styles.fullWidth}>Panduan pemarkahan guru<textarea rows={3} value={form.guide} onChange={e=>setForm({...form,guide:e.target.value})}/><small>Tidak dipaparkan kepada murid.</small></label>}<button className={styles.primaryButton} disabled={busy}>Tambah soalan</button></form></div></div></section>
  <section className={styles.panel+" "+styles.reviewPanel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>LANGKAH 3</span><h2>Keputusan dan semakan</h2></div><button className={styles.textButton} type="button" onClick={()=>void detail()}>Muat semula</button></div>{roster.length>0?<section className={styles.markCollectionPanel}>
  <div className={styles.markCollectionHeading}><div><span className={styles.eyebrow}>RUMUSAN KELAS</span><h3>Kutipan markah setiap murid</h3><p>Senarai ini hanya memaparkan murid dalam kelas yang berada di bawah penugasan akaun guru. Markah terbaik dikira sekali bagi setiap murid.</p></div><span className={styles.markCollectionCount}>{studentSummaries.length} MURID</span></div>
