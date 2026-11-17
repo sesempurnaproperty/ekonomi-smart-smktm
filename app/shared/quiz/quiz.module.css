@@ -596,20 +596,19 @@ mark.annotationRepeat { background:#e8e4fb; color:#55448d; text-decoration:under
   font-size:13px;
   line-height:1;
 }
-.saveAnnotationsButton {
-  justify-self:start;
-  min-height:34px;
-  padding:8px 12px;
-  border:1px solid #cfe6d7;
+.saveAnnotationsHint {
+  margin:0;
+  padding:8px 10px;
+  border:1px solid #e1ebe3;
   border-radius:7px;
-  background:#eaf6ed;
-  color:#176b48;
-  cursor:pointer;
-  font:inherit;
-  font-size:9px;
-  font-weight:900;
+  background:#f3f8f4;
+  color:#71867a;
+  font-size:8px;
+  line-height:1.5;
 }
-.saveAnnotationsButton:disabled { opacity:.5; cursor:wait; }
+.saveAnnotationsHint strong {
+  color:#176b50;
+}
 
 /* Student answer scripts with teacher's inline marks */
 .studentAttemptDetails {
