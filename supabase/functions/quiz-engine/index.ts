@@ -787,12 +787,15 @@ async function saveMarkingAnnotations(
 
   if (profile.role === "teacher") {
     const attemptRows = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
-      select: "id,student_id",
+      select: "id,student_id,status",
       id: "eq." + String(responseRow.attempt_id),
       limit: "1"
     });
     const attempt = attemptRows[0];
     if (!attempt) return { error: "Percubaan murid tidak ditemui.", status: 404 };
+    if (attempt.status === "in_progress") {
+      return { error: "Murid masih belum menghantar percubaan ini. Tanda pemarkahan hanya boleh diberikan selepas jawapan dihantar.", status: 409 };
+    }
 
     const studentRows = await getRows(supabaseUrl, secretKey, "user_profiles", {
       select: "user_id,academic_class_id,is_active,role",
