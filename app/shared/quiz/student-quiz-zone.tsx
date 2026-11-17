@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createClient } from "../../../lib/supabase/client";
 import styles from "./quiz.module.css";
 
@@ -85,7 +85,7 @@ const MARK_TYPES:{type:MarkType;symbol:string;label:string}[]=[
 ];
 function renderStudentMarkedAnswer(text:string,annotations:MarkAnnotation[]|null|undefined){
  const valid=(annotations??[]).filter(a=>Number.isInteger(a.start)&&Number.isInteger(a.end)&&a.start>=0&&a.end<=text.length&&a.end>a.start&&text.slice(a.start,a.end)===a.text).slice().sort((a,b)=>a.start-b.start);
- const nodes:React.ReactNode[]=[];let cursor=0;
+ const nodes:ReactNode[]=[];let cursor=0;
  valid.forEach(a=>{
   if(a.start<cursor)return;
   if(a.start>cursor)nodes.push(<React.Fragment key={"student-plain-"+cursor}>{text.slice(cursor,a.start)}</React.Fragment>);
