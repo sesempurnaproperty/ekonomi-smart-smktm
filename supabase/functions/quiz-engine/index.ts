@@ -179,6 +179,112 @@ function asNumber(value: unknown, fallback = 0) {
   return Number.isFinite(number) ? number : fallback;
 }
 
+async function signQuestionImagePaths(
+  supabaseUrl: string,
+  secretKey: string,
+  quizId: string,
+  callerId: string,
+  profile: JsonRecord,
+  requestedPaths: unknown
+) {
+  if (!isStaff(profile) && profile.role !== "student") {
+    return { error: "Akses imej soalan tidak dibenarkan.", status: 403 };
+  }
+  if (!Array.isArray(requestedPaths) || requestedPaths.length > 100) {
+    return { error: "Senarai imej soalan tidak sah.", status: 400 };
+  }
+  const paths = [...new Set(requestedPaths.filter((path): path is string =>
+    typeof path === "string" && path.length > 0 && path.length <= 500
+  ))];
+  if (!paths.length) return { image_urls: [] };
+
+  const quizzes = await getRows(supabaseUrl, secretKey, "learning_quizzes", {
+    select: "id,created_by,target_form_level,status,available_from,available_until",
+    id: "eq." + quizId,
+    limit: "1"
+  });
+  const quiz = quizzes[0];
+  if (!quiz) return { error: "Kuiz tidak ditemui.", status: 404 };
+
+  if (profile.role === "teacher") {
+    let allowed = String(quiz.created_by) === callerId;
+    if (!allowed) {
+      const assignments = await getRows(supabaseUrl, secretKey, "class_teacher_assignments", {
+        select: "class_id",
+        teacher_user_id: "eq." + callerId,
+        limit: "100"
+      });
+      const assignedIds = assignments.map((row) => String(row.class_id));
+      if (assignedIds.length) {
+        const classes = await getRows(supabaseUrl, secretKey, "academic_classes", {
+          select: "id,form_level",
+          id: "in.(" + assignedIds.join(",") + ")",
+          is_active: "eq.true",
+          limit: "100"
+        });
+        allowed = classes.some((row) =>
+          quiz.target_form_level === null || Number(row.form_level) === Number(quiz.target_form_level)
+        );
+      }
+    }
+    if (!allowed) return { error: "Akses imej ditolak. Kuiz ini bukan dalam skop kelas yang ditugaskan kepada anda.", status: 403 };
+  } else if (profile.role === "student") {
+    const eligibleQuiz = await studentCanTakeQuiz(supabaseUrl, secretKey, quizId, profile);
+    if (!eligibleQuiz) {
+      const attempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
+        select: "id",
+        quiz_id: "eq." + quizId,
+        student_id: "eq." + callerId,
+        limit: "1"
+      });
+      if (!attempts.length) return { error: "Anda tidak mempunyai akses kepada gambar kuiz ini.", status: 403 };
+    }
+  } else if (profile.role !== "admin") {
+    return { error: "Akses pentadbir diperlukan.", status: 403 };
+  }
+
+  const questionRows = await getRows(supabaseUrl, secretKey, "quiz_questions", {
+    select: "image_path",
+    quiz_id: "eq." + quizId,
+    image_path: "in.(" + paths.join(",") + ")",
+    limit: "200"
+  });
+  const allowedPaths = new Set(questionRows
+    .map((row) => String(row.image_path ?? ""))
+    .filter(Boolean));
+  if (paths.some((path) => !allowedPaths.has(path))) {
+    return { error: "Satu atau lebih imej tidak dipautkan kepada kuiz ini.", status: 400 };
+  }
+
+  const signedResults = await Promise.all(paths.map(async (path) => {
+    const signUrl = new URL(
+      "/storage/v1/object/sign/quiz-question-images/" + path,
+      supabaseUrl
+    );
+    const response = await fetch(signUrl, {
+      method: "POST",
+      headers: {
+        apikey: secretKey,
+        Authorization: "Bearer " + secretKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ expiresIn: 3600 })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error("Pautan imej gagal dijana: " + response.status + " " + JSON.stringify(body).slice(0, 250));
+    }
+    const rawUrl = body.signedURL ?? body.signedUrl ?? body.signed_url;
+    if (typeof rawUrl !== "string") throw new Error("Supabase tidak memulangkan pautan imej yang sah.");
+    const url = rawUrl.startsWith("http")
+      ? rawUrl
+      : supabaseUrl + "/storage/v1" + (rawUrl.startsWith("/") ? rawUrl : "/" + rawUrl);
+    return { path, url };
+  }));
+
+  return { image_urls: signedResults };
+}
+
 async function removeQuestionImageObjects(
   supabaseUrl: string,
   secretKey: string,
@@ -1122,6 +1228,11 @@ Deno.serve(async (req: Request) => {
         })),
         quizzes: historyQuizzes
       };
+    } else if (action === "sign_question_images") {
+      if (typeof body.quiz_id !== "string") return send({ error: "ID kuiz tidak sah." }, 400, origin);
+      result = await signQuestionImagePaths(
+        supabaseUrl, secretKey, body.quiz_id, callerId, profile, body.image_paths
+      );
     } else if (action === "start_attempt") {
       if (profile.role !== "student") return send({ error: "Tindakan ini khusus untuk murid." }, 403, origin);
       if (typeof body.quiz_id !== "string") return send({ error: "ID kuiz tidak sah." }, 400, origin);
