@@ -140,7 +140,6 @@ Semua tindakan simpan tanda diperiksa di Edge Function; guru hanya boleh menanda
 - Guru boleh memuat naik JPG, PNG atau WebP sehingga 5 MB bagi satu gambar soalan.
 - Soalan objektif masih menggunakan pilihan A-D dan kunci jawapan automatik; soalan struktur masih menggunakan panduan pemarkahan manual.
 - Gambar disimpan dalam bucket Supabase Storage private `quiz-question-images`, dengan laluan disusun mengikut ID kuiz.
-- Pautan imej ditandatangani untuk tempoh terhad. Murid hanya dibenarkan membaca gambar kuiz yang diterbitkan kepada tingkatan mereka atau kuiz yang pernah mereka sertai.
-- Guru boleh membaca gambar kuiz milik sendiri atau kuiz bagi tingkatan kelas yang ditugaskan; pentadbir boleh membaca semua gambar.
+- Pautan imej dijana oleh Edge Function sebagai signed URL untuk tempoh terhad. Fungsi ini mengesahkan guru pemilik/penugasan kelas, kelayakan tingkatan murid atau rekod percubaan terdahulu sebelum memulangkan pautan.
 - Gambar dipaparkan dalam pembina kuiz, ruang menjawab murid, sejarah skrip murid dan semakan guru.
 - Apabila soalan atau keseluruhan kuiz dipadam, Edge Function turut memadam fail imej berkaitannya melalui Storage API.
