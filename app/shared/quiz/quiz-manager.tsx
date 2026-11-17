@@ -5,11 +5,11 @@ import {createClient} from "../../../lib/supabase/client";
 import styles from "./quiz.module.css";
 type Quiz={id:string;title:string;description:string|null;target_form_level:number|null;chapter_id:string|null;attempt_limit:number;status:string};
 type Chapter={id:string;form_level:number;chapter_number:number;title:string};
-type Question={id:string;quiz_id:string;question_order:number;question_type:"objective"|"structured";prompt:string;marks:number};
+type Question={id:string;quiz_id:string;question_order:number;question_type:"objective"|"structured";prompt:string;marks:number;image_path:string|null;image_url?:string|null};
 type Option={id:string;question_id:string;option_code:string;option_text:string;option_order:number};
 type MarkType="right"|"wrong"|"tr"|"repeat";
 type MarkAnnotation={id:string;start:number;end:number;text:string;type:MarkType;comment?:string};
-type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;auto_score:number|null;teacher_score:number|null;feedback:string|null;marking_annotations?:MarkAnnotation[]|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null}|null};
+type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;auto_score:number|null;teacher_score:number|null;feedback:string|null;marking_annotations?:MarkAnnotation[]|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null;image_path:string|null;image_url?:string|null}|null};
 const MARK_TYPES:{type:MarkType;symbol:string;label:string}[]=[
  {type:"right",symbol:"✓",label:"Mengandungi markah"},
  {type:"wrong",symbol:"✗",label:"Jawapan salah"},
@@ -32,7 +32,7 @@ function renderMarkedAnswer(text:string,annotations:MarkAnnotation[]|null|undefi
 }
 type A={id:string;student_id:string;attempt_number:number;status:string;total_score:number;max_score:number;student:{full_name:string;form_level:number;class_name:string}|null;responses:R[]};
 type StudentRoster={user_id:string;full_name:string;form_level:number;class_name:string;academic_class_id:string};
-const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:""};
+const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:"",imageFile:null as File|null,imagePreviewUrl:""};
 export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:string;roleLabel:string}){
  const s=useMemo(()=>createClient(),[]);const [uid,setUid]=useState("");const [quizzes,setQuizzes]=useState<Quiz[]>([]);const [chapters,setChapters]=useState<Chapter[]>([]);
  const [quizId,setQuizId]=useState("");const [questions,setQuestions]=useState<Question[]>([]);const [options,setOptions]=useState<Option[]>([]);const [attempts,setAttempts]=useState<A[]>([]);const [attemptId,setAttemptId]=useState("");const [roster,setRoster]=useState<StudentRoster[]>([]);
@@ -41,12 +41,64 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  const [annotationDrafts,setAnnotationDrafts]=useState<Record<string,MarkAnnotation[]>>({});
  const [selectedRanges,setSelectedRanges]=useState<Record<string,{start:number;end:number;text:string}>>({});
  const answerRefs=useRef<Record<string,HTMLDivElement|null>>({});
+ const imageInputRef=useRef<HTMLInputElement|null>(null);
  const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [notice,setNotice]=useState("");
  const refresh=useCallback(async()=>{setLoading(true);const [u,q,c]=await Promise.all([s.auth.getUser(),s.from("learning_quizzes").select("*").order("created_at",{ascending:false}),s.from("learning_chapters").select("id,form_level,chapter_number,title").order("form_level").order("chapter_number")]);if(u.error||!u.data.user){setError("Sesi tidak sah.");setLoading(false);return;}if(q.error||c.error){setError(q.error?.message??c.error?.message??"Gagal memuatkan data.");setLoading(false);return;}setUid(u.data.user.id);const rows=(q.data??[]) as Quiz[];setQuizzes(rows);setChapters((c.data??[]) as Chapter[]);setQuizId(x=>x&&rows.some(q=>q.id===x)?x:rows[0]?.id??"");setLoading(false);},[s]);
  useEffect(()=>{void refresh();},[refresh]);
- const detail=useCallback(async()=>{if(!quizId){setQuestions([]);setOptions([]);setAttempts([]);setRoster([]);return;}const [q,o,a]=await Promise.all([s.from("quiz_questions").select("*").eq("quiz_id",quizId).order("question_order"),s.from("quiz_options").select("*").order("option_order"),s.functions.invoke("quiz-engine",{body:{action:"list_attempts",quiz_id:quizId}})]);if(q.error||o.error||a.error||a.data?.error){setError(q.error?.message??o.error?.message??a.error?.message??a.data?.error??"Gagal memuatkan kuiz.");return;}const qs=(q.data??[]) as Question[];setQuestions(qs);const ids=new Set(qs.map(q=>q.id));setOptions(((o.data??[]) as Option[]).filter(x=>ids.has(x.question_id)));const ars=(a.data?.attempts??[]) as A[];setAttempts(ars);setRoster((a.data?.students??[]) as StudentRoster[]);setAttemptId(x=>x&&ars.some(a=>a.id===x)?x:ars[0]?.id??"");const drafts:Record<string,{score:string;feedback:string}>={};ars.forEach(a=>a.responses?.forEach(r=>{if(r.question?.question_type==="structured")drafts[r.id]={score:r.teacher_score==null?"":String(r.teacher_score),feedback:r.feedback??""};}));setGrades(drafts);
+ useEffect(()=>()=>{if(form.imagePreviewUrl)URL.revokeObjectURL(form.imagePreviewUrl);},[form.imagePreviewUrl]);
+ const detail=useCallback(async()=>{
+  if(!quizId){setQuestions([]);setOptions([]);setAttempts([]);setRoster([]);return;}
+  const [q,o,a]=await Promise.all([
+   s.from("quiz_questions").select("*").eq("quiz_id",quizId).order("question_order"),
+   s.from("quiz_options").select("*").order("option_order"),
+   s.functions.invoke("quiz-engine",{body:{action:"list_attempts",quiz_id:quizId}})
+  ]);
+  if(q.error||o.error||a.error||a.data?.error){
+   setError(q.error?.message??o.error?.message??a.error?.message??a.data?.error??"Gagal memuatkan kuiz.");
+   return;
+  }
+  const qs=(q.data??[]) as Question[];
+  const arsRaw=(a.data?.attempts??[]) as A[];
+  const imagePaths=[...new Set([
+   ...qs.map(item=>item.image_path),
+   ...arsRaw.flatMap(attempt=>attempt.responses.map(response=>response.question?.image_path??null))
+  ].filter((path):path is string=>typeof path==="string"&&path.length>0))];
+  const signedEntries=await Promise.all(imagePaths.map(async path=>{
+   const {data}=await s.storage.from("quiz-question-images").createSignedUrl(path,3600);
+   return [path,data?.signedUrl??null] as const;
+  }));
+  const signedMap=new Map(signedEntries.filter((entry):entry is readonly [string,string]=>Boolean(entry[1])));
+  const withImage=(question:Question):Question=>({
+   ...question,
+   image_url:question.image_path?signedMap.get(question.image_path)??null:null
+  });
+  setQuestions(qs.map(withImage));
+  const ids=new Set(qs.map(question=>question.id));
+  setOptions(((o.data??[]) as Option[]).filter(option=>ids.has(option.question_id)));
+  const ars=arsRaw.map(attempt=>({
+   ...attempt,
+   responses:attempt.responses.map(response=>({
+    ...response,
+    question:response.question?{
+     ...response.question,
+     image_url:response.question.image_path?signedMap.get(response.question.image_path)??null:null
+    }:null
+   }))
+  }));
+  setAttempts(ars);
+  setRoster((a.data?.students??[]) as StudentRoster[]);
+  setAttemptId(current=>current&&ars.some(attempt=>attempt.id===current)?current:ars[0]?.id??"");
+  const drafts:Record<string,{score:string;feedback:string}>={};
+  ars.forEach(attempt=>attempt.responses?.forEach(response=>{
+   if(response.question?.question_type==="structured"){
+    drafts[response.id]={score:response.teacher_score==null?"":String(response.teacher_score),feedback:response.feedback??""};
+   }
+  }));
+  setGrades(drafts);
   const marks:Record<string,MarkAnnotation[]>={};
-  ars.forEach(a=>a.responses?.forEach(r=>{marks[r.id]=Array.isArray(r.marking_annotations)?r.marking_annotations:[];}));
+  ars.forEach(attempt=>attempt.responses?.forEach(response=>{
+   marks[response.id]=Array.isArray(response.marking_annotations)?response.marking_annotations:[];
+  }));
   setAnnotationDrafts(marks);
   setSelectedRanges({});
  },[quizId,s]);
@@ -72,7 +124,102 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  const bestMaximum=studentSummaries.reduce((sum,x)=>sum+Number(x.best?.max_score??0),0);
  const quizStatusLabel=(status:string)=>status==="graded"?"SELESAI DINILAI":status==="pending_review"?"MENUNGGU SEMAKAN":"SEDANG MENJAWAB";
  async function createQuiz(e:FormEvent){e.preventDefault();setBusy(true);setError("");const {data,error:err}=await s.from("learning_quizzes").insert({title:qf.title.trim(),description:qf.description.trim()||null,target_form_level:qf.target==="all"?null:Number(qf.target),chapter_id:qf.chapter_id||null,attempt_limit:Number(qf.limit),created_by:uid,status:"draft"}).select("*").single();setBusy(false);if(err||!data){setError(err?.message??"Kuiz gagal dicipta.");return;}setQf({title:"",description:"",target:"all",chapter_id:"",limit:"1"});setQuizId(data.id);setNotice("Kuiz dicipta sebagai draf.");await refresh();}
- async function addQuestion(e:FormEvent){e.preventDefault();if(form.kind==="objective"&&form.options.some(x=>!x.trim())){setError("Lengkapkan empat pilihan jawapan.");return;}setBusy(true);setError("");try{const {data:q,error:qErr}=await s.from("quiz_questions").insert({quiz_id:quizId,question_order:questions.length+1,question_type:form.kind,prompt:form.prompt.trim(),marks:Number(form.marks)}).select("*").single();if(qErr||!q)throw new Error(qErr?.message??"Soalan gagal disimpan.");let correctId:string|null=null;if(form.kind==="objective"){const {data:o,error:oErr}=await s.from("quiz_options").insert(form.options.map((v,i)=>({question_id:q.id,option_code:["A","B","C","D"][i],option_text:v.trim(),option_order:i+1}))).select("*");if(oErr||!o)throw new Error(oErr?.message??"Pilihan gagal disimpan.");correctId=(o as Option[]).find(x=>x.option_code===form.correct)?.id??null;}const {data:k,error:kErr}=await s.functions.invoke("quiz-engine",{body:{action:"save_answer_key",question_id:q.id,correct_option_id:correctId,marking_guide:form.kind==="structured"?form.guide.trim():null}});if(kErr||k?.error){await s.from("quiz_questions").delete().eq("id",q.id);throw new Error(kErr?.message??k?.error??"Kunci jawapan gagal disimpan.");}setForm(fresh);setNotice("Soalan berjaya ditambah.");await detail();}catch(e){setError(e instanceof Error?e.message:"Soalan gagal disimpan.");}finally{setBusy(false);}}
+ function chooseQuestionImage(file:File|null){
+  if(!file)return;
+  const allowed=["image/jpeg","image/png","image/webp"];
+  if(!allowed.includes(file.type)){
+   setError("Format gambar tidak disokong. Gunakan JPG, PNG atau WebP.");
+   if(imageInputRef.current)imageInputRef.current.value="";
+   return;
+  }
+  if(file.size>5*1024*1024){
+   setError("Saiz gambar melebihi 5 MB. Kecilkan gambar sebelum dimuat naik.");
+   if(imageInputRef.current)imageInputRef.current.value="";
+   return;
+  }
+  setForm(current=>({...current,imageFile:file,imagePreviewUrl:URL.createObjectURL(file)}));
+  setError("");
+ }
+
+ function clearQuestionImage(){
+  setForm(current=>({...current,imageFile:null,imagePreviewUrl:""}));
+  if(imageInputRef.current)imageInputRef.current.value="";
+ }
+
+ async function addQuestion(e:FormEvent){
+  e.preventDefault();
+  if(!form.prompt.trim()&&!form.imageFile){
+   setError("Taip pernyataan soalan atau muat naik gambar soalan.");
+   return;
+  }
+  if(form.kind==="objective"&&form.options.some(value=>!value.trim())){
+   setError("Lengkapkan empat pilihan jawapan.");
+   return;
+  }
+  setBusy(true);setError("");setNotice("");
+  let imagePath:string|null=null;
+  let createdQuestionId:string|null=null;
+  try{
+   if(form.imageFile){
+    const extension=form.imageFile.type==="image/jpeg"?"jpg":form.imageFile.type==="image/png"?"png":"webp";
+    imagePath=quizId+"/"+crypto.randomUUID()+"."+extension;
+    const {data:signedUpload,error:signError}=await s.storage.from("quiz-question-images").createSignedUploadUrl(imagePath);
+    if(signError||!signedUpload)throw new Error(signError?.message??"Pautan muat naik gambar gagal dijana.");
+    const {error:uploadError}=await s.storage.from("quiz-question-images").uploadToSignedUrl(
+     imagePath,signedUpload.token,form.imageFile,{contentType:form.imageFile.type,cacheControl:"3600"}
+    );
+    if(uploadError)throw new Error(uploadError.message);
+   }
+
+   const {data:q,error:qErr}=await s.from("quiz_questions").insert({
+    quiz_id:quizId,
+    question_order:questions.length+1,
+    question_type:form.kind,
+    prompt:form.prompt.trim()||(imagePath?"Lihat gambar soalan":""),
+    marks:Number(form.marks),
+    image_path:imagePath
+   }).select("*").single();
+   if(qErr||!q)throw new Error(qErr?.message??"Soalan gagal disimpan.");
+   createdQuestionId=q.id;
+
+   let correctId:string|null=null;
+   if(form.kind==="objective"){
+    const {data:o,error:oErr}=await s.from("quiz_options").insert(
+     form.options.map((value,index)=>({
+      question_id:q.id,
+      option_code:["A","B","C","D"][index],
+      option_text:value.trim(),
+      option_order:index+1
+     }))
+    ).select("*");
+    if(oErr||!o)throw new Error(oErr?.message??"Pilihan jawapan gagal disimpan.");
+    correctId=(o as Option[]).find(option=>option.option_code===form.correct)?.id??null;
+   }
+
+   const {data:k,error:kErr}=await s.functions.invoke("quiz-engine",{body:{
+    action:"save_answer_key",
+    question_id:q.id,
+    correct_option_id:correctId,
+    marking_guide:form.kind==="structured"?form.guide.trim():null
+   }});
+   if(kErr||k?.error)throw new Error(kErr?.message??k?.error??"Kunci jawapan gagal disimpan.");
+
+   setForm({...fresh});
+   if(imageInputRef.current)imageInputRef.current.value="";
+   setNotice(imagePath?"Soalan dan gambar berjaya dimuat naik.":"Soalan berjaya ditambah.");
+   await detail();
+  }catch(cause){
+   if(createdQuestionId){
+    await s.from("quiz_questions").delete().eq("id",createdQuestionId);
+   }
+   if(imagePath){
+    await s.storage.from("quiz-question-images").remove([imagePath]);
+   }
+   setError(cause instanceof Error?cause.message:"Soalan gagal disimpan.");
+  }finally{
+   setBusy(false);
+  }
+ }
  async function publish(){if(!selected)return;setBusy(true);const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"publish_quiz",quiz_id:selected.id}});setBusy(false);if(err||data?.error){setError(err?.message??data?.error??"Gagal menerbitkan kuiz.");return;}setNotice("Kuiz berjaya diterbitkan.");await refresh();}
  async function unpublish(){if(!selected)return;setBusy(true);const {error:err}=await s.from("learning_quizzes").update({status:"draft"}).eq("id",selected.id);setBusy(false);if(err)setError(err.message);else{setNotice("Kuiz ditarik balik.");await refresh();}}
  async function resetAttempts(){
@@ -186,13 +333,28 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   : null}
  <button className={styles.deleteButton} type="button" disabled={busy} onClick={()=>void removeQuiz()}>Padam kuiz</button>
 </div></div>
- <div className={styles.questionLayout}><div><h3>Soalan ({questions.length})</h3>{questions.length===0?<p className={styles.emptyText}>Tambahkan soalan untuk membina kuiz.</p>:questions.map(q=><article className={styles.questionCard} key={q.id}><div className={styles.questionMeta}><span>SOALAN {q.question_order}</span><span>{q.question_type==="objective"?"OBJEKTIF":"STRUKTUR"}</span><span>{q.marks} markah</span></div><p>{q.prompt}</p>{q.question_type==="objective"?<ol className={styles.optionList} type="A">{options.filter(o=>o.question_id===q.id).map(o=><li key={o.id}>{o.option_text}</li>)}</ol>:<small>Jawapan struktur — ditanda secara manual.</small>}
+ <div className={styles.questionLayout}><div><h3>Soalan ({questions.length})</h3>{questions.length===0?<p className={styles.emptyText}>Tambahkan soalan untuk membina kuiz.</p>:questions.map(q=><article className={styles.questionCard} key={q.id}><div className={styles.questionMeta}><span>SOALAN {q.question_order}</span><span>{q.question_type==="objective"?"OBJEKTIF":"STRUKTUR"}</span><span>{q.marks} markah</span></div>{q.image_url?<img className={styles.questionImagePreview} src={q.image_url} alt={"Gambar soalan "+q.question_order}/>:null}{q.prompt!=="Lihat gambar soalan"?<p>{q.prompt}</p>:null}{q.question_type==="objective"?<ol className={styles.optionList} type="A">{options.filter(o=>o.question_id===q.id).map(o=><li key={o.id}>{o.option_text}</li>)}</ol>:<small>Jawapan struktur — ditanda secara manual.</small>}
  <div className={styles.questionCardActions}>
   <span>{selected.status==="published"?"Tarik balik kuiz untuk mengubah soalan.":attempts.length>0?"Reset percubaan sebelum memadam soalan.":"Soalan boleh dipadam."}</span>
   <button className={styles.questionDeleteButton} type="button" disabled={busy||selected.status==="published"} onClick={()=>void removeQuestion(q)}>Padam soalan</button>
  </div>
 </article>)}</div>
- <div className={styles.addQuestionBox}><h3>Tambah soalan</h3><form className={styles.form} onSubmit={addQuestion}><label>Jenis<select value={form.kind} onChange={e=>setForm({...form,kind:e.target.value as "objective"|"structured"})}><option value="objective">Objektif automatik</option><option value="structured">Struktur manual</option></select></label><label>Markah<input type="number" min="0.5" step="0.5" value={form.marks} onChange={e=>setForm({...form,marks:e.target.value})}/></label><label className={styles.fullWidth}>Pernyataan soalan<textarea required rows={4} value={form.prompt} onChange={e=>setForm({...form,prompt:e.target.value})}/></label>{form.kind==="objective"?<>{form.options.map((v,i)=><label key={i}>Pilihan {["A","B","C","D"][i]}<input required value={v} onChange={e=>setForm(x=>({...x,options:x.options.map((o,j)=>i===j?e.target.value:o)}))}/></label>)}<label className={styles.fullWidth}>Jawapan betul<select value={form.correct} onChange={e=>setForm({...form,correct:e.target.value})}>{["A","B","C","D"].map(x=><option key={x}>{x}</option>)}</select></label></>:<label className={styles.fullWidth}>Panduan pemarkahan guru<textarea rows={3} value={form.guide} onChange={e=>setForm({...form,guide:e.target.value})}/><small>Tidak dipaparkan kepada murid.</small></label>}<button className={styles.primaryButton} disabled={busy}>Tambah soalan</button></form></div></div></section>
+ <div className={styles.addQuestionBox}><h3>Tambah soalan</h3><form className={styles.form} onSubmit={addQuestion}><label>Jenis<select value={form.kind} onChange={e=>setForm({...form,kind:e.target.value as "objective"|"structured"})}><option value="objective">Objektif automatik</option><option value="structured">Struktur manual</option></select></label><label>Markah<input type="number" min="0.5" step="0.5" value={form.marks} onChange={e=>setForm({...form,marks:e.target.value})}/></label><label className={styles.fullWidth}>Pernyataan / arahan soalan (pilihan jika menggunakan gambar)<textarea rows={3} required={!form.imageFile} value={form.prompt} onChange={e=>setForm({...form,prompt:e.target.value})} placeholder="Taip soalan di sini, atau muat naik gambar soalan di bawah..."/></label>
+ <div className={styles.questionImageUploader}>
+  <div className={styles.questionImageUploadCopy}>
+   <strong>Gambar soalan (pilihan)</strong>
+   <span>Muat naik foto, rajah, graf, jadual atau imej soalan. Boleh digunakan bersama teks atau sebagai soalan bergambar sahaja.</span>
+   <small>JPG, PNG atau WebP · Maksimum 5 MB</small>
+  </div>
+  <label className={styles.imageUploadButton}>
+   {form.imageFile?"Tukar gambar":"Pilih gambar soalan"}
+   <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>chooseQuestionImage(event.currentTarget.files?.[0]??null)} disabled={busy||selected?.status==="published"}/>
+  </label>
+  {form.imagePreviewUrl?<div className={styles.questionImageLocalPreview}>
+   <img src={form.imagePreviewUrl} alt="Pratonton gambar soalan yang dipilih"/>
+   <button type="button" className={styles.removeQuestionImageButton} disabled={busy} onClick={clearQuestionImage}>Buang gambar</button>
+  </div>:null}
+ </div>{form.kind==="objective"?<>{form.options.map((v,i)=><label key={i}>Pilihan {["A","B","C","D"][i]}<input required value={v} onChange={e=>setForm(x=>({...x,options:x.options.map((o,j)=>i===j?e.target.value:o)}))}/></label>)}<label className={styles.fullWidth}>Jawapan betul<select value={form.correct} onChange={e=>setForm({...form,correct:e.target.value})}>{["A","B","C","D"].map(x=><option key={x}>{x}</option>)}</select></label></>:<label className={styles.fullWidth}>Panduan pemarkahan guru<textarea rows={3} value={form.guide} onChange={e=>setForm({...form,guide:e.target.value})}/><small>Tidak dipaparkan kepada murid.</small></label>}<button className={styles.primaryButton} disabled={busy||selected?.status==="published"}>{busy?"Menyimpan...":"Tambah soalan"}</button></form></div></div></section>
  <section className={styles.panel+" "+styles.reviewPanel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>LANGKAH 3</span><h2>Keputusan dan semakan</h2></div><button className={styles.textButton} type="button" onClick={()=>void detail()}>Muat semula</button></div>{roster.length>0?<section className={styles.markCollectionPanel}>
  <div className={styles.markCollectionHeading}><div><span className={styles.eyebrow}>RUMUSAN KELAS</span><h3>Kutipan markah setiap murid</h3><p>Senarai ini hanya memaparkan murid dalam kelas yang berada di bawah penugasan akaun guru. Markah terbaik dikira sekali bagi setiap murid.</p></div><span className={styles.markCollectionCount}>{studentSummaries.length} MURID</span></div>
  <div className={styles.markCollectionStats}>
@@ -214,7 +376,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  </table></div>
  <p className={styles.markCollectionFootnote}>Murid tanpa percubaan turut disenaraikan. Percubaan belum dihantar dan jawapan yang menunggu semakan tidak dikira sebagai markah akhir.</p>
 </section>:<div className={styles.emptyText}>Tiada murid dalam kelas yang ditugaskan kepada akaun ini untuk kuiz berkenaan.</div>}
-{attempts.length===0?<p className={styles.emptyText}>Belum ada percubaan murid.</p>:<div className={styles.reviewLayout}><div className={styles.attemptList}>{attempts.map(a=><button type="button" key={a.id} className={a.id===attemptId?styles.attemptItemActive:styles.attemptItem} onClick={()=>setAttemptId(a.id)}><strong>{a.student?.full_name??"Murid"}</strong><small>{a.student?"T"+a.student.form_level+" · "+a.student.class_name:""} · Percubaan {a.attempt_number}</small><span className={a.status==="graded"?styles.publishedTag:styles.draftTag}>{quizStatusLabel(a.status)}</span><small>{a.total_score}/{a.max_score} markah</small></button>)}</div><div className={styles.responseReview}>{selectedAttempt?<><div className={styles.resultSummary}><strong>{selectedAttempt.student?.full_name??"Murid"}</strong><strong>{selectedAttempt.total_score}/{selectedAttempt.max_score}</strong></div>{selectedAttempt.responses.map((r,i)=><article className={styles.responseCard} key={r.id}><div className={styles.questionMeta}><span>SOALAN {r.question?.question_order??i+1}</span><span>{r.question?.marks??0} markah</span></div><p>{r.question?.prompt}</p>{r.question?.question_type==="structured"&&r.question?.marking_guide?<div className={styles.responseInfo}>Panduan pemarkahan guru: {r.question.marking_guide}</div>:null}{r.question?.question_type==="objective"?<div className={styles.responseInfo}>Jawapan {r.selected_option?.option_code??"—"} {r.selected_option?.option_text??"Tidak dijawab"} · Markah automatik {r.auto_score??0}</div>:<><div
+{attempts.length===0?<p className={styles.emptyText}>Belum ada percubaan murid.</p>:<div className={styles.reviewLayout}><div className={styles.attemptList}>{attempts.map(a=><button type="button" key={a.id} className={a.id===attemptId?styles.attemptItemActive:styles.attemptItem} onClick={()=>setAttemptId(a.id)}><strong>{a.student?.full_name??"Murid"}</strong><small>{a.student?"T"+a.student.form_level+" · "+a.student.class_name:""} · Percubaan {a.attempt_number}</small><span className={a.status==="graded"?styles.publishedTag:styles.draftTag}>{quizStatusLabel(a.status)}</span><small>{a.total_score}/{a.max_score} markah</small></button>)}</div><div className={styles.responseReview}>{selectedAttempt?<><div className={styles.resultSummary}><strong>{selectedAttempt.student?.full_name??"Murid"}</strong><strong>{selectedAttempt.total_score}/{selectedAttempt.max_score}</strong></div>{selectedAttempt.responses.map((r,i)=><article className={styles.responseCard} key={r.id}><div className={styles.questionMeta}><span>SOALAN {r.question?.question_order??i+1}</span><span>{r.question?.marks??0} markah</span></div>{r.question?.image_url?<img className={styles.questionImagePreview} src={r.question.image_url} alt={"Gambar soalan "+(r.question.question_order??i+1)}/>:null}{r.question?.prompt!=="Lihat gambar soalan"?<p>{r.question?.prompt}</p>:null}{r.question?.question_type==="structured"&&r.question?.marking_guide?<div className={styles.responseInfo}>Panduan pemarkahan guru: {r.question.marking_guide}</div>:null}{r.question?.question_type==="objective"?<div className={styles.responseInfo}>Jawapan {r.selected_option?.option_code??"—"} {r.selected_option?.option_text??"Tidak dijawab"} · Markah automatik {r.auto_score??0}</div>:<><div
  ref={node=>{answerRefs.current[r.id]=node;}}
  className={styles.studentAnswer+" "+styles.teacherSelectableAnswer}
  onMouseUp={()=>captureSelection(r.id)}
