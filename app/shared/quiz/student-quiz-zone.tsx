@@ -12,6 +12,17 @@ type Quiz = {
   attempt_limit: number;
   status: string;
 };
+type MarkType = "right" | "wrong" | "tr" | "repeat";
+type MarkAnnotation = { id:string; start:number; end:number; text:string; type:MarkType; comment?:string };
+type ScoredResponse = {
+  id:string;
+  response_text:string|null;
+  auto_score:number|null;
+  teacher_score:number|null;
+  feedback:string|null;
+  marking_annotations:MarkAnnotation[]|null;
+  question:{question_order:number;question_type:"objective"|"structured";prompt:string;marks:number}|null;
+};
 type Attempt = {
   id: string;
   quiz_id: string;
@@ -21,6 +32,7 @@ type Attempt = {
   max_score: number;
   objective_score: number;
   submitted_at: string | null;
+  responses?: ScoredResponse[];
 };
 type Option = { id: string; option_code: string; option_text: string; option_order: number };
 type Question = {
@@ -64,6 +76,27 @@ function statusLabel(status: string) {
   if (status === "graded") return "SELESAI DINILAI";
   if (status === "pending_review") return "MENUNGGU SEMAKAN";
   return "SEDANG MENJAWAB";
+}
+const MARK_TYPES:{type:MarkType;symbol:string;label:string}[]=[
+ {type:"right",symbol:"✓",label:"Mengandungi markah"},
+ {type:"wrong",symbol:"✗",label:"Jawapan salah"},
+ {type:"tr",symbol:"TR",label:"Tidak relevan"},
+ {type:"repeat",symbol:"U",label:"Ulangan jawapan"}
+];
+function renderStudentMarkedAnswer(text:string,annotations:MarkAnnotation[]|null|undefined){
+ const valid=(annotations??[]).filter(a=>Number.isInteger(a.start)&&Number.isInteger(a.end)&&a.start>=0&&a.end<=text.length&&a.end>a.start&&text.slice(a.start,a.end)===a.text).slice().sort((a,b)=>a.start-b.start);
+ const nodes:React.ReactNode[]=[];let cursor=0;
+ valid.forEach(a=>{
+  if(a.start<cursor)return;
+  if(a.start>cursor)nodes.push(<React.Fragment key={"student-plain-"+cursor}>{text.slice(cursor,a.start)}</React.Fragment>);
+  const symbol=MARK_TYPES.find(x=>x.type===a.type)?.symbol??"";
+  const cls=a.type==="right"?styles.studentMarkRight:a.type==="wrong"?styles.studentMarkWrong:a.type==="tr"?styles.studentMarkTR:styles.studentMarkRepeat;
+  nodes.push(<mark key={a.id} className={cls}>{a.text}</mark>);
+  nodes.push(<span key={"student-symbol-"+a.id} className={styles.studentMarkSymbol+" "+cls} title={MARK_TYPES.find(x=>x.type===a.type)?.label}>{symbol}</span>);
+  cursor=a.end;
+ });
+ if(cursor<text.length)nodes.push(<React.Fragment key={"student-plain-end-"+cursor}>{text.slice(cursor)}</React.Fragment>);
+ return nodes;
 }
 
 export default function StudentQuizZone({ formLevel, className }: { formLevel: number; className: string | null }) {
@@ -339,16 +372,38 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
                       {item.attempts.length > 0 ? (
                         <div className={styles.studentAttemptHistory}>
                           {item.attempts.map((attempt) => (
-                            <div className={styles.studentAttemptRow} key={attempt.id}>
-                              <span>Percubaan {attempt.attempt_number}</span>
-                              <span className={attempt.status === "graded" ? styles.historyDone : attempt.status === "pending_review" ? styles.historyPending : styles.historyProgress}>
-                                {attempt.status === "graded"
-                                  ? displayMark(attempt.total_score) + " / " + displayMark(attempt.max_score)
-                                  : attempt.status === "pending_review"
-                                    ? "Menunggu guru · " + displayMark(attempt.objective_score) + " markah objektif"
-                                    : "Belum dihantar"}
-                              </span>
-                            </div>
+                            <details className={styles.studentAttemptDetails} key={attempt.id}>
+                              <summary className={styles.studentAttemptRow}>
+                                <span>Percubaan {attempt.attempt_number} · LIHAT SKRIP</span>
+                                <span className={attempt.status === "graded" ? styles.historyDone : attempt.status === "pending_review" ? styles.historyPending : styles.historyProgress}>
+                                  {attempt.status === "graded"
+                                    ? displayMark(attempt.total_score) + " / " + displayMark(attempt.max_score)
+                                    : attempt.status === "pending_review"
+                                      ? "Menunggu guru · " + displayMark(attempt.objective_score) + " markah objektif"
+                                      : "Belum dihantar"}
+                                </span>
+                              </summary>
+                              {attempt.responses?.length ? (
+                                <div className={styles.studentMarkedScripts}>
+                                  {attempt.responses.filter(response=>response.question?.question_type==="structured").map((response,index)=>(
+                                    <article className={styles.studentMarkedScript} key={response.id}>
+                                      <div className={styles.questionMeta}>
+                                        <span>SOALAN {response.question?.question_order??index+1}</span>
+                                        <span>{displayMark(response.teacher_score??0)} / {displayMark(response.question?.marks??0)} MARKAH STRUKTUR</span>
+                                      </div>
+                                      <strong className={styles.studentMarkedQuestion}>{response.question?.prompt}</strong>
+                                      <div className={styles.studentMarkedAnswer}>{response.response_text?renderStudentMarkedAnswer(response.response_text,response.marking_annotations):"Tiada jawapan bertulis."}</div>
+                                      {response.feedback?<p className={styles.studentMarkedFeedback}>Ulasan guru: {response.feedback}</p>:null}
+                                    </article>
+                                  ))}
+                                  <div className={styles.studentMarkLegend}>
+                                    {MARK_TYPES.map(mark=><span key={mark.type}><strong>{mark.symbol}</strong> {mark.label}</span>)}
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className={styles.studentNoMarkedScript}>Skrip dan tanda pemarkahan akan dipaparkan selepas guru menyemak jawapan struktur.</p>
+                              )}
+                            </details>
                           ))}
                         </div>
                       ) : null}
