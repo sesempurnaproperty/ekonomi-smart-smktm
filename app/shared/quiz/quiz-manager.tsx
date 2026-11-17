@@ -1,13 +1,35 @@
 "use client";
 import Link from "next/link";
-import {FormEvent,useCallback,useEffect,useMemo,useState} from "react";
+import {Fragment,FormEvent,useCallback,useEffect,useMemo,useRef,useState,type ReactNode} from "react";
 import {createClient} from "../../../lib/supabase/client";
 import styles from "./quiz.module.css";
 type Quiz={id:string;title:string;description:string|null;target_form_level:number|null;chapter_id:string|null;attempt_limit:number;status:string};
 type Chapter={id:string;form_level:number;chapter_number:number;title:string};
 type Question={id:string;quiz_id:string;question_order:number;question_type:"objective"|"structured";prompt:string;marks:number};
 type Option={id:string;question_id:string;option_code:string;option_text:string;option_order:number};
-type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;auto_score:number|null;teacher_score:number|null;feedback:string|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null}|null};
+type MarkType="right"|"wrong"|"tr"|"repeat";
+type MarkAnnotation={id:string;start:number;end:number;text:string;type:MarkType;comment?:string};
+type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;auto_score:number|null;teacher_score:number|null;feedback:string|null;marking_annotations?:MarkAnnotation[]|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null}|null};
+const MARK_TYPES:{type:MarkType;symbol:string;label:string}[]=[
+ {type:"right",symbol:"✓",label:"Mengandungi markah"},
+ {type:"wrong",symbol:"✗",label:"Jawapan salah"},
+ {type:"tr",symbol:"TR",label:"Tidak relevan"},
+ {type:"repeat",symbol:"U",label:"Ulangan jawapan"}
+];
+function renderMarkedAnswer(text:string,annotations:MarkAnnotation[]|null|undefined,showSymbols:boolean):ReactNode[]{
+ const valid=(annotations??[]).filter(a=>Number.isInteger(a.start)&&Number.isInteger(a.end)&&a.start>=0&&a.end<=text.length&&a.end>a.start&&text.slice(a.start,a.end)===a.text).slice().sort((a,b)=>a.start-b.start);
+ const nodes:ReactNode[]=[];let cursor=0;
+ valid.forEach((a)=>{
+  if(a.start<cursor)return;
+  if(a.start>cursor)nodes.push(<Fragment key={"plain-"+cursor}>{text.slice(cursor,a.start)}</Fragment>);
+  const cls=a.type==="right"? "annotationRight":a.type==="wrong"?"annotationWrong":a.type==="tr"?"annotationTR":"annotationRepeat";
+  nodes.push(<mark key={a.id} className={cls} title={MARK_TYPES.find(x=>x.type===a.type)?.label}>{a.text}</mark>);
+  if(showSymbols)nodes.push(<span key={"symbol-"+a.id} className={"annotationSymbol "+cls}>{MARK_TYPES.find(x=>x.type===a.type)?.symbol}</span>);
+  cursor=a.end;
+ });
+  if(cursor<text.length)nodes.push(<Fragment key={"plain-end-"+cursor}>{text.slice(cursor)}</Fragment>);
+  return nodes;
+}
 type A={id:string;student_id:string;attempt_number:number;status:string;total_score:number;max_score:number;student:{full_name:string;form_level:number;class_name:string}|null;responses:R[]};
 type StudentRoster={user_id:string;full_name:string;form_level:number;class_name:string;academic_class_id:string};
 const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:""};
@@ -15,10 +37,19 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  const s=useMemo(()=>createClient(),[]);const [uid,setUid]=useState("");const [quizzes,setQuizzes]=useState<Quiz[]>([]);const [chapters,setChapters]=useState<Chapter[]>([]);
  const [quizId,setQuizId]=useState("");const [questions,setQuestions]=useState<Question[]>([]);const [options,setOptions]=useState<Option[]>([]);const [attempts,setAttempts]=useState<A[]>([]);const [attemptId,setAttemptId]=useState("");const [roster,setRoster]=useState<StudentRoster[]>([]);
  const [qf,setQf]=useState({title:"",description:"",target:"all",chapter_id:"",limit:"1"});const [form,setForm]=useState(fresh);
- const [grades,setGrades]=useState<Record<string,{score:string;feedback:string}>>({});const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [notice,setNotice]=useState("");
+ const [grades,setGrades]=useState<Record<string,{score:string;feedback:string}>>({});
+ const [annotationDrafts,setAnnotationDrafts]=useState<Record<string,MarkAnnotation[]>>({});
+ const [selectedRanges,setSelectedRanges]=useState<Record<string,{start:number;end:number;text:string}>>({});
+ const answerRefs=useRef<Record<string,HTMLDivElement|null>>({});
+ const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [notice,setNotice]=useState("");
  const refresh=useCallback(async()=>{setLoading(true);const [u,q,c]=await Promise.all([s.auth.getUser(),s.from("learning_quizzes").select("*").order("created_at",{ascending:false}),s.from("learning_chapters").select("id,form_level,chapter_number,title").order("form_level").order("chapter_number")]);if(u.error||!u.data.user){setError("Sesi tidak sah.");setLoading(false);return;}if(q.error||c.error){setError(q.error?.message??c.error?.message??"Gagal memuatkan data.");setLoading(false);return;}setUid(u.data.user.id);const rows=(q.data??[]) as Quiz[];setQuizzes(rows);setChapters((c.data??[]) as Chapter[]);setQuizId(x=>x&&rows.some(q=>q.id===x)?x:rows[0]?.id??"");setLoading(false);},[s]);
  useEffect(()=>{void refresh();},[refresh]);
- const detail=useCallback(async()=>{if(!quizId){setQuestions([]);setOptions([]);setAttempts([]);setRoster([]);return;}const [q,o,a]=await Promise.all([s.from("quiz_questions").select("*").eq("quiz_id",quizId).order("question_order"),s.from("quiz_options").select("*").order("option_order"),s.functions.invoke("quiz-engine",{body:{action:"list_attempts",quiz_id:quizId}})]);if(q.error||o.error||a.error||a.data?.error){setError(q.error?.message??o.error?.message??a.error?.message??a.data?.error??"Gagal memuatkan kuiz.");return;}const qs=(q.data??[]) as Question[];setQuestions(qs);const ids=new Set(qs.map(q=>q.id));setOptions(((o.data??[]) as Option[]).filter(x=>ids.has(x.question_id)));const ars=(a.data?.attempts??[]) as A[];setAttempts(ars);setRoster((a.data?.students??[]) as StudentRoster[]);setAttemptId(x=>x&&ars.some(a=>a.id===x)?x:ars[0]?.id??"");const drafts:Record<string,{score:string;feedback:string}>={};ars.forEach(a=>a.responses?.forEach(r=>{if(r.question?.question_type==="structured")drafts[r.id]={score:r.teacher_score==null?"":String(r.teacher_score),feedback:r.feedback??""};}));setGrades(drafts);},[quizId,s]);
+ const detail=useCallback(async()=>{if(!quizId){setQuestions([]);setOptions([]);setAttempts([]);setRoster([]);return;}const [q,o,a]=await Promise.all([s.from("quiz_questions").select("*").eq("quiz_id",quizId).order("question_order"),s.from("quiz_options").select("*").order("option_order"),s.functions.invoke("quiz-engine",{body:{action:"list_attempts",quiz_id:quizId}})]);if(q.error||o.error||a.error||a.data?.error){setError(q.error?.message??o.error?.message??a.error?.message??a.data?.error??"Gagal memuatkan kuiz.");return;}const qs=(q.data??[]) as Question[];setQuestions(qs);const ids=new Set(qs.map(q=>q.id));setOptions(((o.data??[]) as Option[]).filter(x=>ids.has(x.question_id)));const ars=(a.data?.attempts??[]) as A[];setAttempts(ars);setRoster((a.data?.students??[]) as StudentRoster[]);setAttemptId(x=>x&&ars.some(a=>a.id===x)?x:ars[0]?.id??"");const drafts:Record<string,{score:string;feedback:string}>={};ars.forEach(a=>a.responses?.forEach(r=>{if(r.question?.question_type==="structured")drafts[r.id]={score:r.teacher_score==null?"":String(r.teacher_score),feedback:r.feedback??""};}));setGrades(drafts);
+  const marks:Record<string,MarkAnnotation[]>={};
+  ars.forEach(a=>a.responses?.forEach(r=>{marks[r.id]=Array.isArray(r.marking_annotations)?r.marking_annotations:[];}));
+  setAnnotationDrafts(marks);
+  setSelectedRanges({});
+ },[quizId,s]);
  useEffect(()=>{void detail();},[detail]);
  const selected=quizzes.find(q=>q.id===quizId)??null;const selectedAttempt=attempts.find(a=>a.id===attemptId)??null;const chapterMap=new Map(chapters.map(c=>[c.id,c]));
  const studentSummaries=useMemo(()=>roster.map(student=>{
@@ -90,6 +121,51 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   await detail();
  }
 
+ function captureSelection(responseId:string){
+  const root=answerRefs.current[responseId];
+  const selection=window.getSelection();
+  if(!root||!selection||selection.rangeCount===0)return;
+  const range=selection.getRangeAt(0);
+  if(!root.contains(range.startContainer)||!root.contains(range.endContainer))return;
+  const text=selection.toString();
+  if(!text.trim())return;
+  const prefix=range.cloneRange();
+  prefix.selectNodeContents(root);
+  prefix.setEnd(range.startContainer,range.startOffset);
+  const start=prefix.toString().length;
+  setSelectedRanges(current=>({...current,[responseId]:{start,end:start+text.length,text}}));
+ }
+
+ function addAnnotation(responseId:string,type:MarkType){
+  const selected=selectedRanges[responseId];
+  if(!selected)return;
+  const existing=annotationDrafts[responseId]??[];
+  const overlap=existing.some(a=>selected.start<a.end&&selected.end>a.start);
+  if(overlap){setError("Frasa ini sudah mempunyai tanda. Buang tanda lama dahulu jika mahu menukarnya.");return;}
+  const annotation:MarkAnnotation={id:crypto.randomUUID(),...selected,type};
+  setAnnotationDrafts(current=>({...current,[responseId]:[...(current[responseId]??[]),annotation].sort((a,b)=>a.start-b.start)}));
+  setSelectedRanges(current=>({...current,[responseId]:undefined as never}));
+  window.getSelection()?.removeAllRanges();
+  setError("");
+ }
+
+ function removeAnnotation(responseId:string,annotationId:string){
+  setAnnotationDrafts(current=>({...current,[responseId]:(current[responseId]??[]).filter(a=>a.id!==annotationId)}));
+ }
+
+ async function saveAnnotations(responseId:string){
+  setBusy(true);setError("");setNotice("");
+  const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{
+   action:"save_marking_annotations",
+   response_id:responseId,
+   annotations:annotationDrafts[responseId]??[]
+  }});
+  setBusy(false);
+  if(err||data?.error){setError(err?.message??data?.error??"Tanda pemarkahan gagal disimpan.");return;}
+  setNotice("Tanda pemarkahan berjaya disimpan. Murid boleh melihat tanda pada perkataan yang telah ditandakan.");
+  await detail();
+ }
+
  async function grade(r:R){const d=grades[r.id];if(!d?.score.trim()){setError("Masukkan markah.");return;}setBusy(true);const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"grade_response",response_id:r.id,teacher_score:Number(d.score),feedback:d.feedback}});setBusy(false);if(err||data?.error){setError(err?.message??data?.error??"Markah gagal disimpan.");return;}setNotice("Markah struktur disimpan.");await detail();}
  return <main className={styles.pageShell}><header className={styles.topBar}><Link className={styles.brand} href={dashboardHref}><span className={styles.brandMark}>ES</span><span><strong>EKONOMI SMART</strong><small>PENTAKSIRAN DAN KUIZ</small></span></Link><div className={styles.topActions}><span className={styles.roleBadge}>{roleLabel}</span><Link className={styles.backLink} href={dashboardHref}>Dashboard</Link></div></header>
  <section className={styles.pageContent}><div className={styles.hero}><span className={styles.eyebrow}>PUSAT PENTAKSIRAN DIGITAL</span><h1>Pengurusan latihan dan kuiz</h1><p>Bina soalan objektif dan struktur, terbitkan kuiz serta semak jawapan murid. {roleLabel === "GURU" ? "Senarai skrip dan pemarkahan dihadkan kepada kelas yang dipautkan kepada akaun guru anda." : "Pentadbir boleh melihat dan menyemak semua percubaan murid."}</p></div>{error?<div className={styles.errorBox}>{error}</div>:null}{notice?<div className={styles.noticeBox}>{notice}</div>:null}
@@ -136,6 +212,35 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  </table></div>
  <p className={styles.markCollectionFootnote}>Murid tanpa percubaan turut disenaraikan. Percubaan belum dihantar dan jawapan yang menunggu semakan tidak dikira sebagai markah akhir.</p>
 </section>:<div className={styles.emptyText}>Tiada murid dalam kelas yang ditugaskan kepada akaun ini untuk kuiz berkenaan.</div>}
-{attempts.length===0?<p className={styles.emptyText}>Belum ada percubaan murid.</p>:<div className={styles.reviewLayout}><div className={styles.attemptList}>{attempts.map(a=><button type="button" key={a.id} className={a.id===attemptId?styles.attemptItemActive:styles.attemptItem} onClick={()=>setAttemptId(a.id)}><strong>{a.student?.full_name??"Murid"}</strong><small>{a.student?"T"+a.student.form_level+" · "+a.student.class_name:""} · Percubaan {a.attempt_number}</small><span className={a.status==="graded"?styles.publishedTag:styles.draftTag}>{quizStatusLabel(a.status)}</span><small>{a.total_score}/{a.max_score} markah</small></button>)}</div><div className={styles.responseReview}>{selectedAttempt?<><div className={styles.resultSummary}><strong>{selectedAttempt.student?.full_name??"Murid"}</strong><strong>{selectedAttempt.total_score}/{selectedAttempt.max_score}</strong></div>{selectedAttempt.responses.map((r,i)=><article className={styles.responseCard} key={r.id}><div className={styles.questionMeta}><span>SOALAN {r.question?.question_order??i+1}</span><span>{r.question?.marks??0} markah</span></div><p>{r.question?.prompt}</p>{r.question?.question_type==="structured"&&r.question?.marking_guide?<div className={styles.responseInfo}>Panduan pemarkahan guru: {r.question.marking_guide}</div>:null}{r.question?.question_type==="objective"?<div className={styles.responseInfo}>Jawapan {r.selected_option?.option_code??"—"} {r.selected_option?.option_text??"Tidak dijawab"} · Markah automatik {r.auto_score??0}</div>:<><div className={styles.studentAnswer}>{r.response_text||"Tiada jawapan."}</div><div className={styles.gradeForm}><label>Markah<input type="number" min="0" max={r.question?.marks??0} step="0.5" value={grades[r.id]?.score??""} onChange={e=>setGrades(x=>({...x,[r.id]:{score:e.target.value,feedback:x[r.id]?.feedback??""}}))}/></label><label>Ulasan guru<input value={grades[r.id]?.feedback??""} onChange={e=>setGrades(x=>({...x,[r.id]:{score:x[r.id]?.score??"",feedback:e.target.value}}))}/></label><button className={styles.secondaryButton} type="button" disabled={busy} onClick={()=>void grade(r)}>Simpan markah</button></div></>}</article>)}</>:<p className={styles.emptyText}>Pilih percubaan murid.</p>}</div></div>}</section></>:null}
+{attempts.length===0?<p className={styles.emptyText}>Belum ada percubaan murid.</p>:<div className={styles.reviewLayout}><div className={styles.attemptList}>{attempts.map(a=><button type="button" key={a.id} className={a.id===attemptId?styles.attemptItemActive:styles.attemptItem} onClick={()=>setAttemptId(a.id)}><strong>{a.student?.full_name??"Murid"}</strong><small>{a.student?"T"+a.student.form_level+" · "+a.student.class_name:""} · Percubaan {a.attempt_number}</small><span className={a.status==="graded"?styles.publishedTag:styles.draftTag}>{quizStatusLabel(a.status)}</span><small>{a.total_score}/{a.max_score} markah</small></button>)}</div><div className={styles.responseReview}>{selectedAttempt?<><div className={styles.resultSummary}><strong>{selectedAttempt.student?.full_name??"Murid"}</strong><strong>{selectedAttempt.total_score}/{selectedAttempt.max_score}</strong></div>{selectedAttempt.responses.map((r,i)=><article className={styles.responseCard} key={r.id}><div className={styles.questionMeta}><span>SOALAN {r.question?.question_order??i+1}</span><span>{r.question?.marks??0} markah</span></div><p>{r.question?.prompt}</p>{r.question?.question_type==="structured"&&r.question?.marking_guide?<div className={styles.responseInfo}>Panduan pemarkahan guru: {r.question.marking_guide}</div>:null}{r.question?.question_type==="objective"?<div className={styles.responseInfo}>Jawapan {r.selected_option?.option_code??"—"} {r.selected_option?.option_text??"Tidak dijawab"} · Markah automatik {r.auto_score??0}</div>:<><div
+ ref={node=>{answerRefs.current[r.id]=node;}}
+ className={styles.studentAnswer+" "+styles.teacherSelectableAnswer}
+ onMouseUp={()=>captureSelection(r.id)}
+ onKeyUp={()=>captureSelection(r.id)}
+ tabIndex={0}
+ aria-label="Pilih perkataan dalam jawapan murid untuk menanda pemarkahan"
+>{renderMarkedAnswer(r.response_text||"Tiada jawapan.",annotationDrafts[r.id],false)}</div>
+ <div className={styles.markingToolbar}>
+  <div className={styles.markingToolbarHeading}>
+   <strong>Tanda pemarkahan pada jawapan</strong>
+   <span>Pilih perkataan atau frasa di atas, kemudian pilih simbol.</span>
+  </div>
+  {selectedRanges[r.id]?<div className={styles.selectedPhrase}>Dipilih: “{selectedRanges[r.id].text}”</div>:<div className={styles.selectionHint}>Tiada teks dipilih. Seret tetikus pada perkataan yang membawa markah atau kesalahan.</div>}
+  <div className={styles.markingToolButtons}>
+   {MARK_TYPES.map(mark=><button key={mark.type} type="button" className={"markingToolButton "+("markingTool"+mark.type)} disabled={!selectedRanges[r.id]||busy} title={mark.label} onClick={()=>addAnnotation(r.id,mark.type)}>
+    <strong>{mark.symbol}</strong><span>{mark.label}</span>
+   </button>)}
+  </div>
+  {(annotationDrafts[r.id]??[]).length>0?<div className={styles.markingAnnotationList}>
+   {(annotationDrafts[r.id]??[]).map(mark=><span className={"markingAnnotationChip markingChip"+mark.type} key={mark.id}>
+    <strong>{MARK_TYPES.find(x=>x.type===mark.type)?.symbol}</strong> {mark.text}
+    <button type="button" aria-label={"Buang tanda "+mark.text} disabled={busy} onClick={()=>removeAnnotation(r.id,mark.id)}>×</button>
+   </span>)}
+  </div>:null}
+  <button type="button" className={styles.saveAnnotationsButton} disabled={busy} onClick={()=>void saveAnnotations(r.id)}>
+   {busy?"Menyimpan...":"Simpan tanda pemarkahan"}
+  </button>
+ </div>
+ <div className={styles.gradeForm}><label>Markah<input type="number" min="0" max={r.question?.marks??0} step="0.5" value={grades[r.id]?.score??""} onChange={e=>setGrades(x=>({...x,[r.id]:{score:e.target.value,feedback:x[r.id]?.feedback??""}}))}/></label><label>Ulasan guru<input value={grades[r.id]?.feedback??""} onChange={e=>setGrades(x=>({...x,[r.id]:{score:x[r.id]?.score??"",feedback:e.target.value}}))}/></label><button className={styles.secondaryButton} type="button" disabled={busy} onClick={()=>void grade(r)}>Simpan markah</button></div></>}</article>)}</>:<p className={styles.emptyText}>Pilih percubaan murid.</p>}</div></div>}</section></>:null}
  </section></main>;
 }
