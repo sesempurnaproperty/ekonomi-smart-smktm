@@ -144,7 +144,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   if(overlap){setError("Frasa ini sudah mempunyai tanda. Buang tanda lama dahulu jika mahu menukarnya.");return;}
   const annotation:MarkAnnotation={id:crypto.randomUUID(),...selected,type};
   setAnnotationDrafts(current=>({...current,[responseId]:[...(current[responseId]??[]),annotation].sort((a,b)=>a.start-b.start)}));
-  setSelectedRanges(current=>({...current,[responseId]:undefined as never}));
+  setSelectedRanges(current=>{const next={...current};delete next[responseId];return next;});
   window.getSelection()?.removeAllRanges();
   setError("");
  }
