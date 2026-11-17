@@ -888,7 +888,8 @@ async function gradeResponse(
   profile: JsonRecord,
   callerId: string,
   scoreValue: unknown,
-  feedbackValue: unknown
+  feedbackValue: unknown,
+  annotationsValue?: unknown
 ) {
   if (!isStaff(profile)) return { error: "Akses guru atau pentadbir diperlukan.", status: 403 };
   const responseRows = await getRows(supabaseUrl, secretKey, "quiz_responses", {
@@ -940,6 +941,15 @@ async function gradeResponse(
   const maximum = asNumber(question.marks);
   if (!Number.isFinite(score) || score < 0 || score > maximum) {
     return { error: "Markah mesti antara 0 hingga " + maximum + ".", status: 400 };
+  }
+
+  // Save inline text annotations in the same teacher action as the score and feedback.
+  // This prevents marks being left in an unsaved draft when the teacher saves only the score.
+  if (Array.isArray(annotationsValue)) {
+    const annotationResult = await saveMarkingAnnotations(
+      supabaseUrl, secretKey, responseId, profile, callerId, annotationsValue
+    );
+    if ("error" in annotationResult) return annotationResult;
   }
 
   await updateRows(supabaseUrl, secretKey, "quiz_responses", {
@@ -1230,7 +1240,10 @@ Deno.serve(async (req: Request) => {
       );
     } else if (action === "grade_response") {
       if (typeof body.response_id !== "string") return send({ error: "ID jawapan tidak sah." }, 400, origin);
-      result = await gradeResponse(supabaseUrl, secretKey, body.response_id, profile, callerId, body.teacher_score, body.feedback);
+      result = await gradeResponse(
+        supabaseUrl, secretKey, body.response_id, profile, callerId,
+        body.teacher_score, body.feedback, body.marking_annotations
+      );
     } else {
       return send({ error: "Tindakan tidak dikenali." }, 400, origin);
     }
