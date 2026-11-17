@@ -14,8 +14,22 @@ type ClassRecord = {
   active_students: number;
   inactive_students: number;
 };
+type TeacherRecord = {
+  user_id: string;
+  full_name: string;
+  username: string;
+  is_active: boolean;
+};
+type AssignmentRecord = {
+  class_id: string;
+  teacher_user_id: string;
+  assigned_at: string;
+  updated_at: string;
+};
 type ClassApiResponse = {
   classes?: ClassRecord[];
+  teachers?: TeacherRecord[];
+  assignments?: AssignmentRecord[];
   total_classes?: number;
   total_students?: number;
   active_students?: number;
@@ -50,6 +64,10 @@ async function callAdmin(payload: Record<string, unknown>): Promise<ClassApiResp
 
 export default function ClassDirectory() {
   const [classes, setClasses] = useState<ClassRecord[]>([]);
+  const [teachers, setTeachers] = useState<TeacherRecord[]>([]);
+  const [assignments, setAssignments] = useState<AssignmentRecord[]>([]);
+  const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, string>>({});
+  const [savingAssignmentFor, setSavingAssignmentFor] = useState("");
   const [totalStudents, setTotalStudents] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -62,8 +80,17 @@ export default function ClassDirectory() {
     setLoading(true);
     setError("");
     try {
-      const result = await callAdmin({ action: "list_classes" });
+      const [result, assignmentResult] = await Promise.all([
+        callAdmin({ action: "list_classes" }),
+        callAdmin({ action: "list_class_teacher_assignments" })
+      ]);
       setClasses(result.classes ?? []);
+      setTeachers(assignmentResult.teachers ?? []);
+      const nextAssignments = assignmentResult.assignments ?? [];
+      setAssignments(nextAssignments);
+      setAssignmentDrafts(Object.fromEntries(
+        nextAssignments.map((item) => [item.class_id, item.teacher_user_id])
+      ));
       setTotalStudents(result.total_students ?? 0);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Senarai kelas gagal dimuatkan.");
@@ -93,6 +120,25 @@ export default function ClassDirectory() {
       setNotice({ kind: "error", text: cause instanceof Error ? cause.message : "Kelas gagal dicipta." });
     } finally {
       setSavingClass(false);
+    }
+  }
+
+  async function saveTeacherAssignment(classId: string) {
+    setSavingAssignmentFor(classId);
+    setNotice(null);
+    try {
+      const teacherUserId = assignmentDrafts[classId] ?? "";
+      const result = await callAdmin({
+        action: "save_class_teacher_assignment",
+        class_id: classId,
+        teacher_user_id: teacherUserId || null
+      });
+      setNotice({ kind: "success", text: result.message ?? "Penugasan guru berjaya dikemaskini." });
+      await refresh();
+    } catch (cause) {
+      setNotice({ kind: "error", text: cause instanceof Error ? cause.message : "Penugasan guru gagal disimpan." });
+    } finally {
+      setSavingAssignmentFor("");
     }
   }
 
@@ -170,6 +216,60 @@ export default function ClassDirectory() {
           </button>
         </form>
         {notice ? <div className={`${styles.classNotice} ${notice.kind === "success" ? styles.classNoticeSuccess : styles.classNoticeError}`} role="status">{notice.text}</div> : null}
+      </section>
+
+      <section className={styles.teacherAssignmentPanel}>
+        <div className={styles.teacherAssignmentHeader}>
+          <div>
+            <span className={styles.classLevel}>PENUGASAN GURU PENILAI</span>
+            <h2 className={styles.teacherAssignmentTitle}>Pautkan guru kepada kelas</h2>
+            <p className={styles.teacherAssignmentDescription}>
+              Guru yang dipautkan akan menerima skrip kuiz dan kebenaran menyemak jawapan struktur bagi kelas tersebut sahaja.
+            </p>
+          </div>
+          <span className={styles.teacherAssignmentCount}>{assignments.length} / {classes.filter((item) => item.is_active).length} KELAS DITUGASKAN</span>
+        </div>
+        {classes.filter((item) => item.is_active).length === 0 ? (
+          <div className={styles.classEmpty}>Daftarkan kelas terlebih dahulu sebelum menetapkan guru penilai.</div>
+        ) : (
+          <div className={styles.teacherAssignmentList}>
+            {classes.filter((item) => item.is_active).map((item) => {
+              const assigned = assignments.find((assignment) => assignment.class_id === item.id);
+              return (
+                <div className={styles.teacherAssignmentRow} key={item.id}>
+                  <div className={styles.teacherAssignmentClassInfo}>
+                    <strong>T{item.form_level} · {item.class_name}</strong>
+                    <small>{item.active_students} murid aktif</small>
+                  </div>
+                  <select
+                    className={styles.teacherAssignmentSelect}
+                    value={assignmentDrafts[item.id] ?? ""}
+                    onChange={(event) => setAssignmentDrafts((current) => ({ ...current, [item.id]: event.target.value }))}
+                    aria-label={"Guru penilai " + item.class_name + " Tingkatan " + item.form_level}
+                  >
+                    <option value="">— Belum ditetapkan —</option>
+                    {teachers.map((teacher) => (
+                      <option value={teacher.user_id} key={teacher.user_id}>
+                        {teacher.full_name} (@{teacher.username})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className={styles.teacherAssignmentSave}
+                    type="button"
+                    disabled={savingAssignmentFor === item.id || (assignmentDrafts[item.id] ?? "") === (assigned?.teacher_user_id ?? "")}
+                    onClick={() => void saveTeacherAssignment(item.id)}
+                  >
+                    {savingAssignmentFor === item.id ? "MENYIMPAN..." : "SIMPAN"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {teachers.length === 0 ? (
+          <p className={styles.teacherAssignmentHint}>Tiada akaun guru aktif ditemui. Aktifkan akaun guru melalui Pengurusan Pengguna.</p>
+        ) : null}
       </section>
 
       {loading ? (
