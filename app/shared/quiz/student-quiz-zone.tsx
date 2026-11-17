@@ -139,11 +139,26 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
     const imagePaths = [...new Set(historyAttempts.flatMap(attempt =>
       (attempt.responses ?? []).map(response=>response.question?.image_path??null)
     ).filter((path):path is string=>typeof path==="string"&&path.length>0))];
-    const signedEntries = await Promise.all(imagePaths.map(async path=>{
-      const {data}=await supabase.storage.from("quiz-question-images").createSignedUrl(path,3600);
-      return [path,data?.signedUrl??null] as const;
+    const imagePathsByQuiz=new Map<string,string[]>();
+    historyAttempts.forEach(attempt=>(attempt.responses??[]).forEach(response=>{
+      const path=response.question?.image_path;
+      if(path){
+        const current=imagePathsByQuiz.get(attempt.quiz_id)??[];
+        current.push(path);
+        imagePathsByQuiz.set(attempt.quiz_id,current);
+      }
     }));
-    const signedMap = new Map(signedEntries.filter((entry):entry is readonly [string,string]=>Boolean(entry[1])));
+    const signedEntries=await Promise.all([...imagePathsByQuiz.entries()].map(async([quizId,paths])=>{
+      const {data,error:signError}=await supabase.functions.invoke("quiz-engine",{
+        body:{action:"sign_question_images",quiz_id:quizId,image_paths:[...new Set(paths)]}
+      });
+      if(signError||data?.error){
+        setError(signError?.message??data?.error??"Gambar sejarah kuiz gagal dimuatkan.");
+        return [];
+      }
+      return (data?.image_urls??[]) as {path:string;url:string}[];
+    }));
+    const signedMap=new Map<string,string>(signedEntries.flat().map(entry=>[entry.path,entry.url]));
     setAttempts(historyAttempts.map(attempt=>({
       ...attempt,
       responses:(attempt.responses??[]).map(response=>({
@@ -215,11 +230,15 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
     }
     const view = data as Active;
     const imagePaths = [...new Set(view.questions.map(question=>question.image_path).filter((path):path is string=>typeof path==="string"&&path.length>0))];
-    const signedEntries = await Promise.all(imagePaths.map(async path=>{
-      const {data:signed}=await supabase.storage.from("quiz-question-images").createSignedUrl(path,3600);
-      return [path,signed?.signedUrl??null] as const;
-    }));
-    const signedMap = new Map(signedEntries.filter((entry):entry is readonly [string,string]=>Boolean(entry[1])));
+    const signResult=imagePaths.length
+      ? await supabase.functions.invoke("quiz-engine",{body:{action:"sign_question_images",quiz_id:quiz.id,image_paths:imagePaths}})
+      : {data:{image_urls:[]},error:null};
+    if(signResult.error||signResult.data?.error){
+      setBusy(false);
+      setError(signResult.error?.message??signResult.data?.error??"Gambar soalan gagal dimuatkan.");
+      return;
+    }
+    const signedMap=new Map<string,string>((signResult.data?.image_urls??[]).map((entry:{path:string;url:string})=>[entry.path,entry.url]));
     const viewWithImages:Active={
       ...view,
       questions:view.questions.map(question=>({
