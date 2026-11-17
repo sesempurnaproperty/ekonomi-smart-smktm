@@ -1,26 +1,455 @@
 "use client";
-import {useCallback,useEffect,useMemo,useState} from "react";
-import {createClient} from "../../../lib/supabase/client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createClient } from "../../../lib/supabase/client";
 import styles from "./quiz.module.css";
-type Quiz={id:string;title:string;description:string|null;target_form_level:number|null;attempt_limit:number};
-type Attempt={id:string;quiz_id:string;attempt_number:number;status:string;total_score:number;max_score:number;objective_score:number;submitted_at:string|null};
-type Option={id:string;option_code:string;option_text:string;option_order:number};
-type Question={id:string;question_order:number;question_type:"objective"|"structured";prompt:string;marks:number;options:Option[]};
-type Active={attempt:Attempt;quiz:{id:string;title:string;description:string|null};questions:Question[];draft_responses?:{question_id:string;selected_option_id:string|null;response_text:string|null}[]};
-type Result={attempt_id:string;status:string;objective_score:number;max_score:number;pending_review_questions:number};
-export default function StudentQuizZone({formLevel,className}:{formLevel:number;className:string|null}){
- const s=useMemo(()=>createClient(),[]);const [quizzes,setQuizzes]=useState<Quiz[]>([]);const [attempts,setAttempts]=useState<Attempt[]>([]);const [active,setActive]=useState<Active|null>(null);const [answers,setAnswers]=useState<Record<string,{selected_option_id?:string;response_text?:string}>>({});const [result,setResult]=useState<Result|null>(null);const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [notice,setNotice]=useState("");
- const refresh=useCallback(async()=>{setLoading(true);const [q,a]=await Promise.all([s.from("learning_quizzes").select("id,title,description,target_form_level,attempt_limit").eq("status","published").order("created_at",{ascending:false}),s.from("quiz_attempts").select("id,quiz_id,attempt_number,status,total_score,max_score,objective_score,submitted_at").order("submitted_at",{ascending:false})]);if(q.error||a.error){setError(q.error?.message??a.error?.message??"Kuiz gagal dimuatkan.");setLoading(false);return;}setQuizzes((q.data??[]) as Quiz[]);setAttempts((a.data??[]) as Attempt[]);setLoading(false);},[s]);useEffect(()=>{void refresh();},[refresh]);
- const attemptMap=useMemo(()=>{const m=new Map<string,Attempt[]>();attempts.forEach(a=>m.set(a.quiz_id,[...(m.get(a.quiz_id)??[]),a]));return m;},[attempts]);
- async function start(q:Quiz){setBusy(true);setError("");setNotice("");setResult(null);const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"start_attempt",quiz_id:q.id}});setBusy(false);if(err||data?.error){setError(err?.message??data?.error??"Kuiz gagal dimulakan.");return;}const view=data as Active;setActive(view);const draft:Record<string,{selected_option_id?:string;response_text?:string}>={};(view.draft_responses??[]).forEach(r=>{draft[r.question_id]={selected_option_id:r.selected_option_id??undefined,response_text:r.response_text??undefined};});setAnswers(draft);}
- async function saveDraft(id:string,selected:string|null,text:string|null){if(!active)return;const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"save_draft_response",attempt_id:active.attempt.id,question_id:id,selected_option_id:selected,response_text:text}});if(err||data?.error)setError(err?.message??data?.error??"Jawapan sementara gagal disimpan.");}
-function choose(id:string,option:string){setAnswers(x=>({...x,[id]:{...x[id],selected_option_id:option}}));void saveDraft(id,option,null);}
- function write(id:string,text:string){setAnswers(x=>({...x,[id]:{...x[id],response_text:text}}));}
-function saveTextDraft(id:string){void saveDraft(id,null,answers[id]?.response_text??"");}
- async function submit(){if(!active)return;const missing=active.questions.filter(q=>q.question_type==="objective"?!answers[q.id]?.selected_option_id:!answers[q.id]?.response_text?.trim()).length;if(!window.confirm(missing?missing+" soalan belum dijawab. Hantar juga?":"Hantar jawapan sekarang? Anda tidak boleh mengubahnya selepas dihantar."))return;setBusy(true);setError("");const payload=active.questions.map(q=>({question_id:q.id,selected_option_id:answers[q.id]?.selected_option_id??null,response_text:answers[q.id]?.response_text??""}));const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"submit_attempt",attempt_id:active.attempt.id,answers:payload}});setBusy(false);if(err||data?.error){setError(err?.message??data?.error??"Jawapan gagal dihantar.");return;}setResult(data as Result);setActive(null);setNotice("Jawapan telah dihantar. Markah objektif dipaparkan serta-merta; jawapan struktur menunggu semakan guru.");await refresh();}
- return <main className={styles.pageShell}><header className={styles.topBar}><div className={styles.brand}><span className={styles.brandMark}>ES</span><span><strong>EKONOMI SMART</strong><small>LATIHAN DAN KUIZ</small></span></div><span className={styles.roleBadge}>TINGKATAN {formLevel}</span></header><section className={styles.pageContent}>
- <div className={styles.hero}><span className={styles.eyebrow}>RUANG LATIHAN MURID</span><h1>Latihan dan kuiz Ekonomi</h1><p>Tingkatan {formLevel}{className?" · "+className:""} — jawab latihan yang diterbitkan oleh guru.</p></div>{error?<div className={styles.errorBox}>{error}</div>:null}{notice?<div className={styles.noticeBox}>{notice}</div>:null}
- {result?<section className={styles.resultCard}><span className={styles.eyebrow}>PENGHANTARAN BERJAYA</span><h2>Jawapan telah direkodkan</h2><div className={styles.resultScore}><strong>{result.objective_score}</strong><span>/ {result.max_score} markah maksimum</span></div><p>{result.pending_review_questions?result.pending_review_questions+" soalan struktur menunggu semakan guru. Markah akhir dikemas kini selepas penilaian.":"Semua soalan dinilai secara automatik. Ini markah akhir percubaan."}</p><button className={styles.secondaryButton} onClick={()=>setResult(null)}>Tutup</button></section>:null}
- {active?<section className={styles.activeQuiz}><div className={styles.activeQuizHeading}><div><span className={styles.eyebrow}>PERCUBAAN {active.attempt.attempt_number}</span><h2>{active.quiz.title}</h2><p>{active.quiz.description??"Jawab semua soalan dan hantar untuk semakan."}</p></div><span className={styles.roleBadge}>{active.questions.reduce((n,q)=>n+Number(q.marks),0)} MARKAH</span></div>{active.questions.map(q=><article className={styles.studentQuestion} key={q.id}><div className={styles.questionMeta}><span>SOALAN {q.question_order}</span><span>{q.marks} MARKAH</span><span>{q.question_type==="objective"?"OBJEKTIF":"STRUKTUR"}</span></div><h3>{q.prompt}</h3>{q.question_type==="objective"?<div className={styles.choiceList}>{q.options.map(o=><label key={o.id} className={answers[q.id]?.selected_option_id===o.id?styles.choiceSelected:styles.choice}><input type="radio" name={q.id} checked={answers[q.id]?.selected_option_id===o.id} onChange={()=>choose(q.id,o.id)}/><span className={styles.choiceCode}>{o.option_code}</span><span>{o.option_text}</span></label>)}</div>:<label className={styles.fullWidth}>Jawapan anda<textarea rows={5} value={answers[q.id]?.response_text??""} onChange={e=>write(q.id,e.target.value)} onBlur={()=>saveTextDraft(q.id)} placeholder="Tulis jawapan anda di sini..."/></label>}</article>)}<div className={styles.submitBar}><button className={styles.secondaryButton} onClick={()=>setActive(null)}>Kembali</button><button className={styles.primaryButton} disabled={busy} onClick={()=>void submit()}>{busy?"Menghantar...":"Hantar jawapan"}</button></div></section>:<><div className={styles.sectionHeading}><h2>Kuiz tersedia</h2><button className={styles.textButton} onClick={()=>void refresh()} disabled={loading}>{loading?"Memuatkan...":"Muat semula"}</button></div>{loading?<div className={styles.emptyState}>Memuatkan senarai kuiz...</div>:quizzes.length===0?<div className={styles.emptyState}>Belum ada kuiz diterbitkan untuk akaun anda.</div>:<div className={styles.quizGrid}>{quizzes.map(q=>{const used=attemptMap.get(q.id)??[];const activeAttempt=used.find(a=>a.status==="in_progress");const full=!activeAttempt&&used.length>=q.attempt_limit;return <article className={styles.quizCard} key={q.id}><div className={styles.questionMeta}><span>{q.target_form_level?"TINGKATAN "+q.target_form_level:"TINGKATAN 4 & 5"}</span><span>{q.attempt_limit} PERCUBAAN</span></div><h2>{q.title}</h2><p>{q.description??"Latihan kendiri Ekonomi."}</p><div className={styles.quizCardMeta}>{used.length}/{q.attempt_limit} percubaan digunakan</div>{used.filter(a=>a.status!=="in_progress").map(a=><div className={styles.pastAttempt} key={a.id}><span>Percubaan {a.attempt_number} · {a.status==="graded"?"Selesai":"Menunggu semakan"}</span><strong>{a.total_score}/{a.max_score}</strong></div>)}<button className={styles.primaryButton} disabled={busy||full} onClick={()=>void start(q)}>{busy?"Memproses...":activeAttempt?"Sambung percubaan":full?"Had percubaan digunakan":"Mulakan kuiz"}</button></article>;})}</div>}</>}
- <p className={styles.privacyNote}>Jawapan objektif disemak secara automatik. Jawapan struktur disemak secara manual oleh guru. Kunci jawapan tidak didedahkan kepada murid.</p></section></main>;
+
+type Quiz = {
+  id: string;
+  title: string;
+  description: string | null;
+  target_form_level: number | null;
+  attempt_limit: number;
+};
+type Attempt = {
+  id: string;
+  quiz_id: string;
+  attempt_number: number;
+  status: string;
+  total_score: number;
+  max_score: number;
+  objective_score: number;
+  submitted_at: string | null;
+};
+type Option = { id: string; option_code: string; option_text: string; option_order: number };
+type Question = {
+  id: string;
+  question_order: number;
+  question_type: "objective" | "structured";
+  prompt: string;
+  marks: number;
+  options: Option[];
+};
+type Active = {
+  attempt: Attempt;
+  quiz: { id: string; title: string; description: string | null };
+  questions: Question[];
+  draft_responses?: { question_id: string; selected_option_id: string | null; response_text: string | null }[];
+};
+type Result = {
+  attempt_id: string;
+  status: string;
+  objective_score: number;
+  max_score: number;
+  pending_review_questions: number;
+};
+type QuizProgress = {
+  quiz: Quiz;
+  attempts: Attempt[];
+  latest: Attempt | null;
+  best: Attempt | null;
+  pendingCount: number;
+  inProgressCount: number;
+};
+
+function displayMark(value: number | string | null | undefined) {
+  const number = Number(value ?? 0);
+  return Number.isInteger(number) ? String(number) : number.toFixed(1);
+}
+function percent(score: number, maximum: number) {
+  return maximum > 0 ? Math.max(0, Math.min(100, (score / maximum) * 100)) : 0;
+}
+function statusLabel(status: string) {
+  if (status === "graded") return "SELESAI DINILAI";
+  if (status === "pending_review") return "MENUNGGU SEMAKAN";
+  return "SEDANG MENJAWAB";
+}
+
+export default function StudentQuizZone({ formLevel, className }: { formLevel: number; className: string | null }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [active, setActive] = useState<Active | null>(null);
+  const [answers, setAnswers] = useState<Record<string, { selected_option_id?: string; response_text?: string }>>({});
+  const [result, setResult] = useState<Result | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    const [quizResult, attemptResult] = await Promise.all([
+      supabase.from("learning_quizzes")
+        .select("id,title,description,target_form_level,attempt_limit")
+        .eq("status", "published")
+        .order("created_at", { ascending: false }),
+      supabase.from("quiz_attempts")
+        .select("id,quiz_id,attempt_number,status,total_score,max_score,objective_score,submitted_at")
+        .order("submitted_at", { ascending: false })
+    ]);
+    if (quizResult.error || attemptResult.error) {
+      setError(quizResult.error?.message ?? attemptResult.error?.message ?? "Rekod kuiz gagal dimuatkan.");
+      setLoading(false);
+      return;
+    }
+    setQuizzes((quizResult.data ?? []) as Quiz[]);
+    setAttempts((attemptResult.data ?? []) as Attempt[]);
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  const quizProgress = useMemo<QuizProgress[]>(() => quizzes.map((quiz) => {
+    const rows = attempts
+      .filter((attempt) => attempt.quiz_id === quiz.id)
+      .slice()
+      .sort((a, b) => b.attempt_number - a.attempt_number);
+    const graded = rows.filter((attempt) => attempt.status === "graded");
+    const best = graded.reduce<Attempt | null>((current, candidate) => {
+      if (!current) return candidate;
+      const currentRate = current.max_score > 0 ? current.total_score / current.max_score : 0;
+      const candidateRate = candidate.max_score > 0 ? candidate.total_score / candidate.max_score : 0;
+      return candidateRate > currentRate ? candidate : current;
+    }, null);
+    return {
+      quiz,
+      attempts: rows,
+      latest: rows[0] ?? null,
+      best,
+      pendingCount: rows.filter((attempt) => attempt.status === "pending_review").length,
+      inProgressCount: rows.filter((attempt) => attempt.status === "in_progress").length
+    };
+  }), [quizzes, attempts]);
+
+  const scoreSummary = useMemo(() => {
+    const assessed = quizProgress.filter((item) => item.best !== null);
+    const earned = assessed.reduce((sum, item) => sum + Number(item.best?.total_score ?? 0), 0);
+    const maximum = assessed.reduce((sum, item) => sum + Number(item.best?.max_score ?? 0), 0);
+    return {
+      earned,
+      maximum,
+      assessed: assessed.length,
+      pending: attempts.filter((attempt) => attempt.status === "pending_review").length,
+      inProgress: attempts.filter((attempt) => attempt.status === "in_progress").length,
+      completed: attempts.filter((attempt) => attempt.status === "graded").length
+    };
+  }, [attempts, quizProgress]);
+
+  async function start(quiz: Quiz) {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    setResult(null);
+    const { data, error: invokeError } = await supabase.functions.invoke("quiz-engine", {
+      body: { action: "start_attempt", quiz_id: quiz.id }
+    });
+    setBusy(false);
+    if (invokeError || data?.error) {
+      setError(invokeError?.message ?? data?.error ?? "Kuiz gagal dimulakan.");
+      return;
+    }
+    const view = data as Active;
+    setActive(view);
+    const draft: Record<string, { selected_option_id?: string; response_text?: string }> = {};
+    (view.draft_responses ?? []).forEach((row) => {
+      draft[row.question_id] = {
+        selected_option_id: row.selected_option_id ?? undefined,
+        response_text: row.response_text ?? undefined
+      };
+    });
+    setAnswers(draft);
+  }
+
+  async function saveDraft(questionId: string, selectedOptionId: string | null, responseText: string | null) {
+    if (!active) return;
+    const { data, error: invokeError } = await supabase.functions.invoke("quiz-engine", {
+      body: {
+        action: "save_draft_response",
+        attempt_id: active.attempt.id,
+        question_id: questionId,
+        selected_option_id: selectedOptionId,
+        response_text: responseText
+      }
+    });
+    if (invokeError || data?.error) {
+      setError(invokeError?.message ?? data?.error ?? "Jawapan sementara gagal disimpan.");
+    }
+  }
+
+  function choose(questionId: string, optionId: string) {
+    setAnswers((current) => ({ ...current, [questionId]: { ...current[questionId], selected_option_id: optionId } }));
+    void saveDraft(questionId, optionId, null);
+  }
+
+  function write(questionId: string, text: string) {
+    setAnswers((current) => ({ ...current, [questionId]: { ...current[questionId], response_text: text } }));
+  }
+
+  function saveTextDraft(questionId: string) {
+    void saveDraft(questionId, null, answers[questionId]?.response_text ?? "");
+  }
+
+  async function submit() {
+    if (!active) return;
+    const unanswered = active.questions.filter((question) =>
+      question.question_type === "objective"
+        ? !answers[question.id]?.selected_option_id
+        : !answers[question.id]?.response_text?.trim()
+    ).length;
+    const confirmation = unanswered
+      ? unanswered + " soalan belum dijawab. Hantar juga?"
+      : "Hantar jawapan sekarang? Anda tidak boleh mengubahnya selepas dihantar.";
+    if (!window.confirm(confirmation)) return;
+
+    setBusy(true);
+    setError("");
+    const payload = active.questions.map((question) => ({
+      question_id: question.id,
+      selected_option_id: answers[question.id]?.selected_option_id ?? null,
+      response_text: answers[question.id]?.response_text ?? ""
+    }));
+    const { data, error: invokeError } = await supabase.functions.invoke("quiz-engine", {
+      body: { action: "submit_attempt", attempt_id: active.attempt.id, answers: payload }
+    });
+    setBusy(false);
+    if (invokeError || data?.error) {
+      setError(invokeError?.message ?? data?.error ?? "Jawapan gagal dihantar.");
+      return;
+    }
+    setResult(data as Result);
+    setActive(null);
+    setNotice("Jawapan telah dihantar. Markah objektif dipaparkan serta-merta; markah struktur menunggu semakan guru.");
+    await refresh();
+  }
+
+  return (
+    <main className={styles.pageShell}>
+      <header className={styles.topBar}>
+        <div className={styles.brand}>
+          <span className={styles.brandMark}>ES</span>
+          <span><strong>EKONOMI SMART</strong><small>LATIHAN DAN KUIZ</small></span>
+        </div>
+        <span className={styles.roleBadge}>TINGKATAN {formLevel}</span>
+      </header>
+
+      <section className={styles.pageContent}>
+        <div className={styles.hero}>
+          <span className={styles.eyebrow}>RUANG LATIHAN MURID</span>
+          <h1>Latihan dan kuiz Ekonomi</h1>
+          <p>Tingkatan {formLevel}{className ? " · " + className : ""} — jawab latihan dan pantau pencapaian anda.</p>
+        </div>
+
+        {error ? <div className={styles.errorBox}>{error}</div> : null}
+        {notice ? <div className={styles.noticeBox}>{notice}</div> : null}
+
+        {!active ? (
+          <section className={styles.studentScoreSection}>
+            <div className={styles.scoreSectionHeading}>
+              <div>
+                <span className={styles.eyebrow}>PAPAN PEMANTAUAN AKADEMIK</span>
+                <h2>Pencapaian saya</h2>
+                <p>Markah terbaik bagi setiap kuiz dikira sekali sahaja. Percubaan belum selesai tidak dimasukkan dalam kutipan markah akhir.</p>
+              </div>
+              <button className={styles.textButton} type="button" onClick={() => void refresh()} disabled={loading}>
+                {loading ? "Memuatkan..." : "KEMAS KINI REKOD ↻"}
+              </button>
+            </div>
+
+            <div className={styles.scoreHeroCard}>
+              <div className={styles.scoreHeroTop}>
+                <div>
+                  <span className={styles.scoreHeroLabel}>MARKAH TERBAIK TERKUMPUL</span>
+                  <div className={styles.scoreHeroValue}>{displayMark(scoreSummary.earned)}<span> / {displayMark(scoreSummary.maximum)}</span></div>
+                  <p>Daripada {scoreSummary.assessed} kuiz yang telah selesai dinilai</p>
+                </div>
+                <div className={styles.scoreHeroPercent}>{scoreSummary.maximum > 0 ? Math.round(percent(scoreSummary.earned, scoreSummary.maximum)) : 0}%</div>
+              </div>
+              <div className={styles.scoreProgressTrack}>
+                <span style={{ width: percent(scoreSummary.earned, scoreSummary.maximum) + "%" }} />
+              </div>
+            </div>
+
+            <div className={styles.scoreStatGrid}>
+              <article className={styles.scoreStatCard}>
+                <span className={styles.scoreStatIcon}>✓</span>
+                <div><strong>{scoreSummary.completed}</strong><small>PERCUBAAN DINILAI</small></div>
+              </article>
+              <article className={styles.scoreStatCard}>
+                <span className={styles.scoreStatIcon}>◷</span>
+                <div><strong>{scoreSummary.pending}</strong><small>MENUNGGU SEMAKAN</small></div>
+              </article>
+              <article className={styles.scoreStatCard}>
+                <span className={styles.scoreStatIcon}>✎</span>
+                <div><strong>{scoreSummary.inProgress}</strong><small>SEDANG MENJAWAB</small></div>
+              </article>
+              <article className={styles.scoreStatCard}>
+                <span className={styles.scoreStatIcon}>◎</span>
+                <div><strong>{scoreSummary.assessed}</strong><small>KUIZ SELESAI DINILAI</small></div>
+              </article>
+            </div>
+
+            <div className={styles.scoreListHeading}>
+              <div><span className={styles.eyebrow}>REKOD INDIVIDU</span><h3>Kutipan markah mengikut kuiz</h3></div>
+              <span className={styles.scoreListCount}>{quizProgress.length} KUIZ</span>
+            </div>
+
+            {loading ? (
+              <div className={styles.emptyState}>Memuatkan rekod pencapaian anda...</div>
+            ) : quizProgress.length === 0 ? (
+              <div className={styles.emptyState}>Belum ada kuiz diterbitkan. Rekod markah akan muncul di sini selepas anda menjawab kuiz.</div>
+            ) : (
+              <div className={styles.studentScoreGrid}>
+                {quizProgress.map((item) => {
+                  const best = item.best;
+                  const latest = item.latest;
+                  const provisional = latest?.status === "pending_review" ? latest : null;
+                  const score = best ? Number(best.total_score) : provisional ? Number(provisional.objective_score) : 0;
+                  const maximum = best ? Number(best.max_score) : provisional ? Number(provisional.max_score) : 0;
+                  return (
+                    <article className={styles.studentScoreCard} key={item.quiz.id}>
+                      <div className={styles.studentScoreCardTop}>
+                        <span className={styles.eyebrow}>TINGKATAN {item.quiz.target_form_level ?? "4 & 5"}</span>
+                        <span className={latest?.status === "graded" ? styles.scoreStatusDone : latest?.status === "pending_review" ? styles.scoreStatusPending : latest?.status === "in_progress" ? styles.scoreStatusProgress : styles.scoreStatusEmpty}>
+                          {latest ? statusLabel(latest.status) : "BELUM DIJAWAB"}
+                        </span>
+                      </div>
+                      <h4>{item.quiz.title}</h4>
+                      <div className={styles.studentScoreCardMarks}>
+                        <strong>{best ? displayMark(best.total_score) + " / " + displayMark(best.max_score) : provisional ? displayMark(provisional.objective_score) + " / " + displayMark(provisional.max_score) + " sementara" : "Belum ada markah"}</strong>
+                        {best ? <span>MARKAH TERBAIK</span> : provisional ? <span>MARKAH OBJEKTIF SEMENTARA</span> : <span>MENUNGGU PERCUBAAN PERTAMA</span>}
+                      </div>
+                      <div className={styles.scoreProgressTrack}>
+                        <span style={{ width: percent(score, maximum) + "%" }} />
+                      </div>
+                      <div className={styles.studentScoreMeta}>
+                        <span>{item.attempts.length}/{item.quiz.attempt_limit} percubaan digunakan</span>
+                        <span>{best ? Math.round(percent(Number(best.total_score), Number(best.max_score))) + "%" : provisional ? "Belum muktamad" : "—"}</span>
+                      </div>
+                      {item.attempts.length > 0 ? (
+                        <div className={styles.studentAttemptHistory}>
+                          {item.attempts.map((attempt) => (
+                            <div className={styles.studentAttemptRow} key={attempt.id}>
+                              <span>Percubaan {attempt.attempt_number}</span>
+                              <span className={attempt.status === "graded" ? styles.historyDone : attempt.status === "pending_review" ? styles.historyPending : styles.historyProgress}>
+                                {attempt.status === "graded"
+                                  ? displayMark(attempt.total_score) + " / " + displayMark(attempt.max_score)
+                                  : attempt.status === "pending_review"
+                                    ? "Menunggu guru · " + displayMark(attempt.objective_score) + " markah objektif"
+                                    : "Belum dihantar"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        ) : null}
+
+        {result ? (
+          <section className={styles.resultCard}>
+            <span className={styles.eyebrow}>PENGHANTARAN BERJAYA</span>
+            <h2>Jawapan telah direkodkan</h2>
+            <div className={styles.resultScore}><strong>{displayMark(result.objective_score)}</strong><span>/ {displayMark(result.max_score)} markah maksimum</span></div>
+            <p>{result.pending_review_questions
+              ? result.pending_review_questions + " soalan struktur menunggu semakan guru. Markah akhir akan dikemas kini selepas penilaian."
+              : "Semua soalan dinilai secara automatik. Ini markah akhir percubaan."}</p>
+            <button className={styles.secondaryButton} type="button" onClick={() => setResult(null)}>Tutup</button>
+          </section>
+        ) : null}
+
+        {active ? (
+          <section className={styles.activeQuiz}>
+            <div className={styles.activeQuizHeading}>
+              <div>
+                <span className={styles.eyebrow}>PERCUBAAN {active.attempt.attempt_number}</span>
+                <h2>{active.quiz.title}</h2>
+                <p>{active.quiz.description ?? "Jawab semua soalan dan hantar untuk semakan."}</p>
+              </div>
+              <span className={styles.roleBadge}>{active.questions.reduce((sum, question) => sum + Number(question.marks), 0)} MARKAH</span>
+            </div>
+            {active.questions.map((question) => (
+              <article className={styles.studentQuestion} key={question.id}>
+                <div className={styles.questionMeta}>
+                  <span>SOALAN {question.question_order}</span>
+                  <span>{question.marks} MARKAH</span>
+                  <span>{question.question_type === "objective" ? "OBJEKTIF" : "STRUKTUR"}</span>
+                </div>
+                <h3>{question.prompt}</h3>
+                {question.question_type === "objective" ? (
+                  <div className={styles.choiceList}>
+                    {question.options.map((option) => (
+                      <label key={option.id} className={answers[question.id]?.selected_option_id === option.id ? styles.choiceSelected : styles.choice}>
+                        <input type="radio" name={question.id} checked={answers[question.id]?.selected_option_id === option.id} onChange={() => choose(question.id, option.id)} />
+                        <span className={styles.choiceCode}>{option.option_code}</span>
+                        <span>{option.option_text}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <label className={styles.fullWidth}>Jawapan anda
+                    <textarea rows={5} value={answers[question.id]?.response_text ?? ""} onChange={(event) => write(question.id, event.target.value)} onBlur={() => saveTextDraft(question.id)} placeholder="Tulis jawapan anda di sini..." />
+                  </label>
+                )}
+              </article>
+            ))}
+            <div className={styles.submitBar}>
+              <button className={styles.secondaryButton} type="button" onClick={() => setActive(null)}>Kembali</button>
+              <button className={styles.primaryButton} type="button" disabled={busy} onClick={() => void submit()}>{busy ? "Menghantar..." : "Hantar jawapan"}</button>
+            </div>
+          </section>
+        ) : (
+          <>
+            <div className={styles.sectionHeading}>
+              <h2>Kuiz tersedia</h2>
+              <button className={styles.textButton} type="button" onClick={() => void refresh()} disabled={loading}>{loading ? "Memuatkan..." : "Muat semula"}</button>
+            </div>
+            {loading ? (
+              <div className={styles.emptyState}>Memuatkan senarai kuiz...</div>
+            ) : quizzes.length === 0 ? (
+              <div className={styles.emptyState}>Belum ada kuiz diterbitkan untuk akaun anda.</div>
+            ) : (
+              <div className={styles.quizGrid}>
+                {quizProgress.map((item) => {
+                  const activeAttempt = item.attempts.find((attempt) => attempt.status === "in_progress");
+                  const full = !activeAttempt && item.attempts.length >= item.quiz.attempt_limit;
+                  return (
+                    <article className={styles.quizCard} key={item.quiz.id}>
+                      <div className={styles.questionMeta}>
+                        <span>{item.quiz.target_form_level ? "TINGKATAN " + item.quiz.target_form_level : "TINGKATAN 4 & 5"}</span>
+                        <span>{item.quiz.attempt_limit} PERCUBAAN</span>
+                      </div>
+                      <h2>{item.quiz.title}</h2>
+                      <p>{item.quiz.description ?? "Latihan kendiri Ekonomi."}</p>
+                      <div className={styles.quizCardMeta}>{item.attempts.length} / {item.quiz.attempt_limit} percubaan digunakan</div>
+                      {item.attempts.map((attempt) => (
+                        <div className={styles.pastAttempt} key={attempt.id}>
+                          <span>Percubaan {attempt.attempt_number} · {statusLabel(attempt.status)}</span>
+                          <strong>{attempt.status === "graded"
+                            ? displayMark(attempt.total_score) + "/" + displayMark(attempt.max_score)
+                            : attempt.status === "pending_review"
+                              ? displayMark(attempt.objective_score) + " sementara"
+                              : "—"}</strong>
+                        </div>
+                      ))}
+                      <button className={styles.primaryButton} type="button" disabled={busy || full} onClick={() => void start(item.quiz)}>
+                        {busy ? "Memproses..." : activeAttempt ? "Sambung percubaan" : full ? "Had percubaan digunakan" : "Mulakan kuiz"}
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        <p className={styles.privacyNote}>Markah akhir dikira daripada percubaan terbaik yang telah selesai dinilai. Markah sementara dan percubaan yang belum dihantar dipaparkan berasingan. Kunci jawapan tidak didedahkan kepada murid.</p>
+      </section>
+    </main>
+  );
 }
