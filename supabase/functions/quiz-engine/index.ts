@@ -179,13 +179,40 @@ function asNumber(value: unknown, fallback = 0) {
   return Number.isFinite(number) ? number : fallback;
 }
 
+async function removeQuestionImageObjects(
+  supabaseUrl: string,
+  secretKey: string,
+  paths: string[]
+) {
+  const uniquePaths = [...new Set(paths.filter((path) => typeof path === "string" && path.length > 0))];
+  if (!uniquePaths.length) return;
+  if (uniquePaths.length > 1000) throw new Error("Terlalu banyak gambar soalan untuk dipadam dalam satu operasi.");
+
+  const response = await fetch(
+    new URL("/storage/v1/object/quiz-question-images", supabaseUrl),
+    {
+      method: "DELETE",
+      headers: {
+        apikey: secretKey,
+        Authorization: "Bearer " + secretKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ prefixes: uniquePaths })
+    }
+  );
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error("Gagal memadam gambar soalan daripada Supabase Storage: " + response.status + " " + detail.slice(0, 300));
+  }
+}
+
 async function getQuestionsAndOptions(
   supabaseUrl: string,
   secretKey: string,
   quizId: string
 ) {
   const questions = await getRows(supabaseUrl, secretKey, "quiz_questions", {
-    select: "id,quiz_id,question_order,question_type,prompt,marks",
+    select: "id,quiz_id,question_order,question_type,prompt,marks,image_path",
     quiz_id: "eq." + quizId,
     order: "question_order.asc",
     limit: "200"
@@ -367,6 +394,16 @@ async function deleteQuiz(
     await deleteRows(supabaseUrl, secretKey, "quiz_attempts", { quiz_id: "eq." + quizId });
   }
 
+  const quizQuestions = await getRows(supabaseUrl, secretKey, "quiz_questions", {
+    select: "image_path",
+    quiz_id: "eq." + quizId,
+    limit: "500"
+  });
+  const imagePaths = quizQuestions
+    .map((question) => question.image_path)
+    .filter((path): path is string => typeof path === "string" && path.length > 0);
+  await removeQuestionImageObjects(supabaseUrl, secretKey, imagePaths);
+
   const deleted = await deleteRows(supabaseUrl, secretKey, "learning_quizzes", { id: "eq." + quizId });
   if (!deleted.length) {
     return { error: "Percubaan telah direset tetapi kuiz tidak dapat dipadam. Kuiz kini berstatus draf; cuba semula atau hubungi pentadbir.", status: 409 };
@@ -396,7 +433,7 @@ async function deleteQuestion(
   }
 
   const questionRows = await getRows(supabaseUrl, secretKey, "quiz_questions", {
-    select: "id,question_order",
+    select: "id,question_order,image_path",
     id: "eq." + questionId,
     quiz_id: "eq." + quizId,
     limit: "1"
@@ -414,6 +451,10 @@ async function deleteQuestion(
       error: "Masih terdapat " + attempts.length + " percubaan murid. Reset percubaan kuiz terlebih dahulu. Jika percubaan kelas lain masih wujud, pentadbir perlu membuat reset penuh sebelum soalan boleh dipadam.",
       status: 409
     };
+  }
+
+  if (typeof question.image_path === "string" && question.image_path) {
+    await removeQuestionImageObjects(supabaseUrl, secretKey, [question.image_path]);
   }
 
   const deleted = await deleteRows(supabaseUrl, secretKey, "quiz_questions", {
@@ -1064,7 +1105,7 @@ Deno.serve(async (req: Request) => {
       }) : [];
       const historyQuestionIds = [...new Set(historyResponses.map((row) => String(row.question_id)))];
       const historyQuestions = historyQuestionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_questions", {
-        select: "id,question_order,question_type,prompt,marks",
+        select: "id,question_order,question_type,prompt,marks,image_path",
         id: "in.(" + historyQuestionIds.join(",") + ")",
         limit: "1000"
       }) : [];
@@ -1181,7 +1222,7 @@ Deno.serve(async (req: Request) => {
       }) : [];
       const questionIds = [...new Set(responseRows.map((r) => String(r.question_id)))];
       const questionRows = questionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_questions", {
-        select: "id,question_type,prompt,marks,question_order",
+        select: "id,question_type,prompt,marks,question_order,image_path",
         id: "in.(" + questionIds.join(",") + ")",
         limit: "1000"
       }) : [];
