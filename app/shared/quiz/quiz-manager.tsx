@@ -168,7 +168,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   if(err||data?.error){setError(err?.message??data?.error??"Pemarkahan gagal disimpan.");return;}
   setNotice("Markah, ulasan dan tanda pada jawapan berjaya disimpan bersama. Murid boleh melihat tanda selepas memuat semula rekod.");
   await detail();
- }}
+ }
  return <main className={styles.pageShell}><header className={styles.topBar}><Link className={styles.brand} href={dashboardHref}><span className={styles.brandMark}>ES</span><span><strong>EKONOMI SMART</strong><small>PENTAKSIRAN DAN KUIZ</small></span></Link><div className={styles.topActions}><span className={styles.roleBadge}>{roleLabel}</span><Link className={styles.backLink} href={dashboardHref}>Dashboard</Link></div></header>
  <section className={styles.pageContent}><div className={styles.hero}><span className={styles.eyebrow}>PUSAT PENTAKSIRAN DIGITAL</span><h1>Pengurusan latihan dan kuiz</h1><p>Bina soalan objektif dan struktur, terbitkan kuiz serta semak jawapan murid. {roleLabel === "GURU" ? "Senarai skrip dan pemarkahan dihadkan kepada kelas yang dipautkan kepada akaun guru anda." : "Pentadbir boleh melihat dan menyemak semua percubaan murid."}</p></div>{error?<div className={styles.errorBox}>{error}</div>:null}{notice?<div className={styles.noticeBox}>{notice}</div>:null}
  <div className={styles.managerGrid}><section className={styles.panel}><span className={styles.eyebrow}>LANGKAH 1</span><h2>Cipta kuiz</h2><form className={styles.form} onSubmit={createQuiz}>
