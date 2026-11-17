@@ -108,3 +108,14 @@ Portal:
 - Guru hanya menerima senarai percubaan kuiz daripada kelas yang dipautkan kepada akaun mereka.
 - Semasa menyimpan markah struktur, Edge Function menyemak semula penugasan kelas pada server. ID jawapan yang bukan daripada kelas yang ditugaskan akan ditolak.
 - Jadual penugasan menggunakan RLS dan hanya diuruskan melalui Edge Function pentadbir yang mengesahkan sesi serta peranan pentadbir.
+
+
+## Pengurusan pemadaman dan reset kuiz
+
+- Guru dan pentadbir boleh memadam kuiz terpilih melalui portal pengurusan kuiz.
+- Pentadbir boleh memadam mana-mana kuiz; tindakan ini membuang kuiz, soalan, pilihan, kunci jawapan, semua percubaan, jawapan murid dan rekod markah berkaitannya.
+- Guru hanya boleh memadam kuiz yang dicipta oleh akaun sendiri. Jika kuiz tersebut mempunyai percubaan daripada kelas di luar penugasan guru, pemadaman ditolak dan perlu dilakukan oleh pentadbir.
+- Fungsi **Reset percubaan** menarik balik penerbitan kuiz dan membuang percubaan serta markah. Untuk guru, reset hanya melibatkan kelas yang ditugaskan kepada akaun mereka; pentadbir boleh reset semua kelas.
+- Kuiz yang telah direset perlu diterbitkan semula sebelum murid boleh menjawab.
+- Soalan individu boleh dipadam apabila kuiz berada dalam status draf dan tiada lagi percubaan murid. Jika masih ada percubaan, reset dahulu. Jika percubaan daripada kelas lain masih wujud, pentadbir perlu membuat reset penuh.
+- Pemadaman memerlukan pengesahan melalui dialog dan tidak boleh dipulihkan selepas selesai.
