@@ -391,3 +391,94 @@
   .markCollectionStats { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .markCollectionPanel { padding:13px; }
 }
+
+
+/* Destructive quiz management controls */
+.quizAdminActions {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  align-items:center;
+  gap:8px;
+}
+.resetButton,.deleteButton,.questionDeleteButton {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:38px;
+  padding:9px 12px;
+  border:1px solid transparent;
+  border-radius:8px;
+  cursor:pointer;
+  font:inherit;
+  font-size:10px;
+  font-weight:900;
+  transition:background .15s ease,border-color .15s ease,opacity .15s ease;
+}
+.resetButton {
+  border-color:#f0dfb7;
+  background:#fff8e9;
+  color:#95651f;
+}
+.resetButton:hover:not(:disabled) {
+  border-color:#e6c982;
+  background:#fff1d3;
+}
+.deleteButton,.questionDeleteButton {
+  border-color:#f0d2cd;
+  background:#fff5f3;
+  color:#ad493e;
+}
+.deleteButton:hover:not(:disabled),.questionDeleteButton:hover:not(:disabled) {
+  border-color:#e7aaa0;
+  background:#ffe9e5;
+}
+.resetButton:disabled,.deleteButton:disabled,.questionDeleteButton:disabled {
+  opacity:.45;
+  cursor:not-allowed;
+}
+.questionCardActions {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:12px;
+  padding-top:10px;
+  border-top:1px solid #edf2ee;
+}
+.questionCardActions span {
+  color:#829188;
+  font-size:8px;
+  line-height:1.45;
+}
+.questionDeleteButton {
+  min-height:29px;
+  padding:6px 10px;
+  font-size:8px;
+  white-space:nowrap;
+}
+@media(max-width:900px) {
+  .quizAdminActions {
+    justify-content:flex-start;
+  }
+}
+@media(max-width:620px) {
+  .quizAdminActions {
+    width:100%;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+  }
+  .quizAdminActions > button {
+    width:100%;
+  }
+  .quizAdminActions > button:first-child {
+    grid-column:1/-1;
+  }
+  .questionCardActions {
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  .questionDeleteButton {
+    width:100%;
+  }
+}
