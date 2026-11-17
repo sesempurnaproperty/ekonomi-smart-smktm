@@ -24,6 +24,7 @@ type RequestBody = {
   user_id?: unknown;
   is_active?: unknown;
   class_id?: unknown;
+  teacher_user_id?: unknown;
   new_class_name?: unknown;
   assessment_code?: unknown;
   max_score?: unknown;
@@ -1228,6 +1229,113 @@ Deno.serve(async (req: Request) => {
         assessments: Array.isArray(assessmentRows) ? assessmentRows : [],
         last_updated: lastUpdated,
         generated_at: new Date().toISOString()
+      }, 200, origin);
+    }
+
+    if (action === "list_class_teacher_assignments") {
+      const [classRows, teacherRows, assignmentRows] = await Promise.all([
+        getClassRows(supabaseUrl, secretKey, {
+          select: "id,form_level,class_name,is_active",
+          order: "form_level.asc,class_name.asc",
+          limit: "500"
+        }),
+        getProfileRows(supabaseUrl, secretKey, {
+          select: "user_id,full_name,username,is_active",
+          role: "eq.teacher",
+          is_active: "eq.true",
+          order: "full_name.asc",
+          limit: "500"
+        }),
+        getTableRows(supabaseUrl, secretKey, "class_teacher_assignments", {
+          select: "class_id,teacher_user_id,assigned_at,updated_at",
+          limit: "500"
+        })
+      ]);
+
+      return response({
+        classes: Array.isArray(classRows) ? classRows : [],
+        teachers: Array.isArray(teacherRows) ? teacherRows : [],
+        assignments: Array.isArray(assignmentRows) ? assignmentRows : []
+      }, 200, origin);
+    }
+
+    if (action === "save_class_teacher_assignment") {
+      const classId = typeof body.class_id === "string" ? body.class_id : "";
+      const teacherUserId = typeof body.teacher_user_id === "string" && body.teacher_user_id.trim()
+        ? body.teacher_user_id.trim()
+        : null;
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidPattern.test(classId)) {
+        return response({ error: "ID kelas tidak sah." }, 400, origin);
+      }
+
+      const classRows = await getClassRows(supabaseUrl, secretKey, {
+        select: "id,form_level,class_name,is_active",
+        id: "eq." + classId,
+        limit: "1"
+      });
+      const classRecord = Array.isArray(classRows) ? classRows[0] : null;
+      if (!classRecord || classRecord.is_active !== true) {
+        return response({ error: "Kelas tidak ditemui atau tidak aktif." }, 404, origin);
+      }
+
+      const assignmentUrl = new URL("/rest/v1/class_teacher_assignments", supabaseUrl);
+      assignmentUrl.searchParams.set("class_id", "eq." + classId);
+
+      if (!teacherUserId) {
+        const remove = await fetch(assignmentUrl, {
+          method: "DELETE",
+          headers: { apikey: secretKey, Prefer: "return=representation" }
+        });
+        if (!remove.ok) {
+          const detail = await remove.text();
+          console.error("Class teacher assignment delete failed:", remove.status, detail.slice(0, 300));
+          return response({ error: "Penugasan guru gagal dibuang." }, 502, origin);
+        }
+        return response({ message: "Penugasan guru bagi kelas ini telah dibuang." }, 200, origin);
+      }
+
+      if (!uuidPattern.test(teacherUserId)) {
+        return response({ error: "ID akaun guru tidak sah." }, 400, origin);
+      }
+      const teacherRows = await getProfileRows(supabaseUrl, secretKey, {
+        select: "user_id,full_name,username,role,is_active",
+        user_id: "eq." + teacherUserId,
+        role: "eq.teacher",
+        is_active: "eq.true",
+        limit: "1"
+      });
+      const teacher = Array.isArray(teacherRows) ? teacherRows[0] : null;
+      if (!teacher) {
+        return response({ error: "Guru tidak ditemui atau akaun guru tidak aktif." }, 404, origin);
+      }
+
+      const upsertUrl = new URL("/rest/v1/class_teacher_assignments", supabaseUrl);
+      upsertUrl.searchParams.set("on_conflict", "class_id");
+      const upsert = await fetch(upsertUrl, {
+        method: "POST",
+        headers: {
+          apikey: secretKey,
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates,return=representation"
+        },
+        body: JSON.stringify({
+          class_id: classId,
+          teacher_user_id: teacherUserId,
+          assigned_by: callerId,
+          assigned_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+      });
+      const upsertRows = await upsert.json().catch(() => []);
+      if (!upsert.ok) {
+        console.error("Class teacher assignment upsert failed:", upsert.status, JSON.stringify(upsertRows).slice(0, 300));
+        return response({ error: "Penugasan guru gagal disimpan." }, 502, origin);
+      }
+
+      return response({
+        message: "Guru penilai berjaya dipautkan kepada Tingkatan " + classRecord.form_level + " " + classRecord.class_name + ".",
+        assignment: Array.isArray(upsertRows) ? upsertRows[0] : null
       }, 200, origin);
     }
 
