@@ -119,3 +119,16 @@ Portal:
 - Kuiz yang telah direset perlu diterbitkan semula sebelum murid boleh menjawab.
 - Soalan individu boleh dipadam apabila kuiz berada dalam status draf dan tiada lagi percubaan murid. Jika masih ada percubaan, reset dahulu. Jika percubaan daripada kelas lain masih wujud, pentadbir perlu membuat reset penuh.
 - Pemadaman memerlukan pengesahan melalui dialog dan tidak boleh dipulihkan selepas selesai.
+
+
+## Pemarkahan struktur dengan tanda pada jawapan
+
+Guru boleh memilih teks pada jawapan struktur murid dan menambah salah satu tanda berikut:
+- `✓` — perkataan atau frasa yang mengandungi isi/markah.
+- `✗` — jawapan salah.
+- `TR` — jawapan tidak relevan.
+- `U` — ulangan jawapan.
+
+Tanda disimpan sebagai anotasi pada respons asal, termasuk kedudukan aksara dan teks yang dipilih. Sistem menolak tanda yang tidak sepadan dengan teks asal atau bertindih dengan tanda lain. Guru boleh membuang tanda dalam draf sebelum menyimpan.
+Murid boleh membuka sejarah setiap percubaan di ruang Latihan dan Kuiz untuk melihat jawapan struktur, simbol guru, markah dan ulasan. Kunci jawapan dan panduan pemarkahan tidak dipaparkan kepada murid.
+Semua tindakan simpan tanda diperiksa di Edge Function; guru hanya boleh menanda jawapan murid daripada kelas yang ditugaskan kepada akaunnya.
