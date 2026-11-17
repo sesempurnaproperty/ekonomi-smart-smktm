@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createClient } from "../../../lib/supabase/client";
 import styles from "./quiz.module.css";
 
@@ -88,14 +88,14 @@ function renderStudentMarkedAnswer(text:string,annotations:MarkAnnotation[]|null
  const nodes:ReactNode[]=[];let cursor=0;
  valid.forEach(a=>{
   if(a.start<cursor)return;
-  if(a.start>cursor)nodes.push(<React.Fragment key={"student-plain-"+cursor}>{text.slice(cursor,a.start)}</React.Fragment>);
+  if(a.start>cursor)nodes.push(<Fragment key={"student-plain-"+cursor}>{text.slice(cursor,a.start)}</Fragment>);
   const symbol=MARK_TYPES.find(x=>x.type===a.type)?.symbol??"";
   const cls=a.type==="right"?styles.studentMarkRight:a.type==="wrong"?styles.studentMarkWrong:a.type==="tr"?styles.studentMarkTR:styles.studentMarkRepeat;
   nodes.push(<mark key={a.id} className={cls}>{a.text}</mark>);
   nodes.push(<span key={"student-symbol-"+a.id} className={styles.studentMarkSymbol+" "+cls} title={MARK_TYPES.find(x=>x.type===a.type)?.label}>{symbol}</span>);
   cursor=a.end;
  });
- if(cursor<text.length)nodes.push(<React.Fragment key={"student-plain-end-"+cursor}>{text.slice(cursor)}</React.Fragment>);
+ if(cursor<text.length)nodes.push(<Fragment key={"student-plain-end-"+cursor}>{text.slice(cursor)}</Fragment>);
  return nodes;
 }
 
