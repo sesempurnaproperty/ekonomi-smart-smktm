@@ -63,11 +63,14 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    ...qs.map(item=>item.image_path),
    ...arsRaw.flatMap(attempt=>attempt.responses.map(response=>response.question?.image_path??null))
   ].filter((path):path is string=>typeof path==="string"&&path.length>0))];
-  const signedEntries=await Promise.all(imagePaths.map(async path=>{
-   const {data}=await s.storage.from("quiz-question-images").createSignedUrl(path,3600);
-   return [path,data?.signedUrl??null] as const;
-  }));
-  const signedMap=new Map(signedEntries.filter((entry):entry is readonly [string,string]=>Boolean(entry[1])));
+  const signedResult=imagePaths.length
+   ? await s.functions.invoke("quiz-engine",{body:{action:"sign_question_images",quiz_id:quizId,image_paths:imagePaths}})
+   : {data:{image_urls:[]},error:null};
+  if(signedResult.error||signedResult.data?.error){
+   setError(signedResult.error?.message??signedResult.data?.error??"Pautan imej soalan gagal dijana.");
+   return;
+  }
+  const signedMap=new Map<string,string>((signedResult.data?.image_urls??[]).map((entry:{path:string;url:string})=>[entry.path,entry.url]));
   const withImage=(question:Question):Question=>({
    ...question,
    image_url:question.image_path?signedMap.get(question.image_path)??null:null
