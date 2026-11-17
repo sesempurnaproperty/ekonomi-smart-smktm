@@ -97,3 +97,14 @@ Portal:
 - Admin → `/admin/kuiz`
 - Guru → `/guru/kuiz`
 - Murid → `/murid/kuiz`
+
+
+## Penugasan guru penilai mengikut kelas
+
+- Pentadbir menetapkan seorang guru penilai utama bagi setiap kelas melalui **Direktori Kelas → Penugasan Guru Penilai**.
+- Satu guru boleh ditugaskan kepada beberapa kelas; satu kelas mempunyai seorang guru penilai utama pada satu-satu masa.
+- Cikgu Ikmal ditugaskan kepada 4 Damai dan 5 Damai.
+- Cikgu Wana ditugaskan kepada 4 Cekal dan 5 Cekal.
+- Guru hanya menerima senarai percubaan kuiz daripada kelas yang dipautkan kepada akaun mereka.
+- Semasa menyimpan markah struktur, Edge Function menyemak semula penugasan kelas pada server. ID jawapan yang bukan daripada kelas yang ditugaskan akan ditolak.
+- Jadual penugasan menggunakan RLS dan hanya diuruskan melalui Edge Function pentadbir yang mengesahkan sesi serta peranan pentadbir.
