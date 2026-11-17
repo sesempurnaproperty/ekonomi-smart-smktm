@@ -482,3 +482,232 @@
     width:100%;
   }
 }
+
+
+/* Inline teacher marking toolbar */
+.teacherSelectableAnswer {
+  user-select:text;
+  cursor:text;
+  line-height:1.9;
+}
+.annotationRight,.annotationWrong,.annotationTR,.annotationRepeat {
+  padding:1px 2px;
+  border-radius:3px;
+  color:inherit;
+  -webkit-box-decoration-break:clone;
+  box-decoration-break:clone;
+}
+mark.annotationRight { background:#d8f2df; color:#155d3a; text-decoration:underline; text-decoration-color:#28935b; text-decoration-thickness:2px; }
+mark.annotationWrong { background:#ffe1df; color:#a3332d; text-decoration:line-through; text-decoration-color:#be4c43; text-decoration-thickness:1.5px; }
+mark.annotationTR { background:#fff0cf; color:#805717; text-decoration:underline wavy #c28a32; }
+mark.annotationRepeat { background:#e8e4fb; color:#55448d; text-decoration:underline dotted #7666b7; }
+.markingToolbar {
+  display:grid;
+  gap:9px;
+  margin-top:10px;
+  padding:12px;
+  border:1px solid #e0e9e2;
+  border-radius:10px;
+  background:#f9fcf9;
+}
+.markingToolbarHeading {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  align-items:baseline;
+  gap:5px 12px;
+}
+.markingToolbarHeading strong {
+  color:#294d3e;
+  font-size:10px;
+}
+.markingToolbarHeading span,.selectionHint {
+  color:#85958a;
+  font-size:8px;
+  line-height:1.5;
+}
+.selectedPhrase {
+  padding:7px 9px;
+  border-radius:6px;
+  background:#edf7ef;
+  color:#206448;
+  font-size:10px;
+  line-height:1.55;
+}
+.markingToolButtons {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:7px;
+}
+.markingToolButton {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  min-height:58px;
+  padding:7px 5px;
+  border:1px solid #dfe9e1;
+  border-radius:8px;
+  background:#fff;
+  cursor:pointer;
+  transition:transform .12s ease,border-color .12s ease,background .12s ease;
+}
+.markingToolButton:hover:not(:disabled) { transform:translateY(-1px); }
+.markingToolButton:disabled { opacity:.4; cursor:not-allowed; }
+.markingToolButton strong { font-size:20px; line-height:1; }
+.markingToolButton span { color:#74857a; font-size:7px; font-weight:800; text-align:center; line-height:1.3; }
+.markingToolright strong { color:#16804c; }
+.markingToolwrong strong { color:#c3443b; }
+.markingTooltr strong { color:#a57724; font-size:15px; }
+.markingToolrepeat strong { color:#6553a6; font-size:17px; }
+.markingAnnotationList {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.markingAnnotationChip {
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  max-width:100%;
+  padding:5px 7px;
+  border:1px solid transparent;
+  border-radius:6px;
+  font-size:8px;
+  line-height:1.3;
+  overflow-wrap:anywhere;
+}
+.markingAnnotationChip strong { font-size:11px; }
+.markingChipright { border-color:#d3ead9; background:#edf8f0; color:#17633d; }
+.markingChipwrong { border-color:#f0d4d0; background:#fff0ee; color:#9f3d35; }
+.markingChiptr { border-color:#eedfbd; background:#fff7e6; color:#8a6421; }
+.markingChiprepeat { border-color:#e2dcf4; background:#f4f1fc; color:#5c4a98; }
+.markingAnnotationChip button {
+  width:17px;
+  height:17px;
+  padding:0;
+  border:0;
+  border-radius:50%;
+  background:rgba(0,0,0,.06);
+  color:inherit;
+  cursor:pointer;
+  font:inherit;
+  font-size:13px;
+  line-height:1;
+}
+.saveAnnotationsButton {
+  justify-self:start;
+  min-height:34px;
+  padding:8px 12px;
+  border:1px solid #cfe6d7;
+  border-radius:7px;
+  background:#eaf6ed;
+  color:#176b48;
+  cursor:pointer;
+  font:inherit;
+  font-size:9px;
+  font-weight:900;
+}
+.saveAnnotationsButton:disabled { opacity:.5; cursor:wait; }
+
+/* Student answer scripts with teacher's inline marks */
+.studentAttemptDetails {
+  border-top:1px solid #edf2ee;
+  padding-top:7px;
+}
+.studentAttemptDetails > summary {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  cursor:pointer;
+  list-style:none;
+}
+.studentAttemptDetails > summary::-webkit-details-marker { display:none; }
+.studentAttemptDetails > summary::after {
+  content:"＋";
+  color:#7d9284;
+  font-size:12px;
+  font-weight:900;
+}
+.studentAttemptDetails[open] > summary::after { content:"−"; }
+.studentMarkedScripts {
+  display:grid;
+  gap:10px;
+  margin:10px 0 4px;
+}
+.studentMarkedScript {
+  padding:11px;
+  border:1px solid #e3ece5;
+  border-radius:9px;
+  background:#fbfdfb;
+}
+.studentMarkedQuestion {
+  display:block;
+  margin:4px 0 8px;
+  color:#24493a;
+  font-size:10px;
+  line-height:1.55;
+}
+.studentMarkedAnswer {
+  padding:10px;
+  border:1px solid #e7eee8;
+  border-radius:8px;
+  background:#fff;
+  color:#536e60;
+  font-size:10px;
+  line-height:1.9;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+.studentMarkRight,.studentMarkWrong,.studentMarkTR,.studentMarkRepeat {
+  padding:1px 2px;
+  border-radius:3px;
+  -webkit-box-decoration-break:clone;
+  box-decoration-break:clone;
+}
+mark.studentMarkRight { background:#dcf4e2; color:#155d3a; text-decoration:underline; text-decoration-color:#28935b; text-decoration-thickness:2px; }
+mark.studentMarkWrong { background:#ffe2df; color:#a3332d; text-decoration:line-through; text-decoration-color:#be4c43; }
+mark.studentMarkTR { background:#fff0cf; color:#805717; text-decoration:underline wavy #c28a32; }
+mark.studentMarkRepeat { background:#e8e4fb; color:#55448d; text-decoration:underline dotted #7666b7; }
+.studentMarkSymbol {
+  display:inline-block;
+  margin:0 2px;
+  padding:0 4px;
+  border-radius:4px;
+  font-size:8px;
+  font-weight:1000;
+  vertical-align:middle;
+}
+.studentMarkSymbol.studentMarkRight { background:#e6f6e9; color:#167344; }
+.studentMarkSymbol.studentMarkWrong { background:#fff0ee; color:#b23a34; }
+.studentMarkSymbol.studentMarkTR { background:#fff6df; color:#956b21; }
+.studentMarkSymbol.studentMarkRepeat { background:#f1edfc; color:#6552a0; }
+.studentMarkedFeedback {
+  margin:8px 0 0;
+  color:#668270;
+  font-size:9px;
+  line-height:1.5;
+}
+.studentMarkLegend {
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px 12px;
+  color:#778a7e;
+  font-size:8px;
+}
+.studentMarkLegend strong { color:#176b50; font-size:10px; }
+.studentNoMarkedScript {
+  margin:8px 0 2px;
+  color:#87958c;
+  font-size:8px;
+  line-height:1.5;
+}
+@media(max-width:620px) {
+  .markingToolButtons { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .markingToolbarHeading { flex-direction:column; }
+  .saveAnnotationsButton { width:100%; }
+  .studentAttemptDetails > summary { align-items:flex-start; }
+  .studentAttemptDetails .studentAttemptRow { flex-direction:row; }
+}
