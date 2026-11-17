@@ -758,6 +758,126 @@ async function publishQuiz(
   return { published: updated.length > 0 };
 }
 
+type MarkingAnnotation = {
+  id: string;
+  start: number;
+  end: number;
+  text: string;
+  type: "right" | "wrong" | "tr" | "repeat";
+  comment?: string;
+};
+
+async function saveMarkingAnnotations(
+  supabaseUrl: string,
+  secretKey: string,
+  responseId: string,
+  profile: JsonRecord,
+  callerId: string,
+  input: unknown
+) {
+  if (!isStaff(profile)) return { error: "Akses guru atau pentadbir diperlukan.", status: 403 };
+
+  const responseRows = await getRows(supabaseUrl, secretKey, "quiz_responses", {
+    select: "id,attempt_id,question_id,response_text",
+    id: "eq." + responseId,
+    limit: "1"
+  });
+  const responseRow = responseRows[0];
+  if (!responseRow) return { error: "Jawapan murid tidak ditemui.", status: 404 };
+
+  if (profile.role === "teacher") {
+    const attemptRows = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
+      select: "id,student_id",
+      id: "eq." + String(responseRow.attempt_id),
+      limit: "1"
+    });
+    const attempt = attemptRows[0];
+    if (!attempt) return { error: "Percubaan murid tidak ditemui.", status: 404 };
+
+    const studentRows = await getRows(supabaseUrl, secretKey, "user_profiles", {
+      select: "user_id,academic_class_id,is_active,role",
+      user_id: "eq." + String(attempt.student_id),
+      limit: "1"
+    });
+    const student = studentRows[0];
+    if (!student || student.role !== "student" || student.is_active !== true || !student.academic_class_id) {
+      return { error: "Murid ini tidak mempunyai kelas aktif yang sah.", status: 403 };
+    }
+
+    const assignments = await getRows(supabaseUrl, secretKey, "class_teacher_assignments", {
+      select: "class_id",
+      teacher_user_id: "eq." + callerId,
+      class_id: "eq." + String(student.academic_class_id),
+      limit: "1"
+    });
+    if (!assignments.length) {
+      return { error: "Akses ditolak. Jawapan ini bukan daripada kelas yang ditugaskan kepada anda.", status: 403 };
+    }
+  }
+
+  const questions = await getRows(supabaseUrl, secretKey, "quiz_questions", {
+    select: "id,question_type,marks",
+    id: "eq." + String(responseRow.question_id),
+    limit: "1"
+  });
+  if (!questions[0] || questions[0].question_type !== "structured") {
+    return { error: "Tanda pemarkahan hanya boleh digunakan pada jawapan struktur.", status: 400 };
+  }
+
+  const answer = typeof responseRow.response_text === "string" ? responseRow.response_text : "";
+  if (!Array.isArray(input) || input.length > 100) {
+    return { error: "Senarai tanda pemarkahan tidak sah atau melebihi 100 tanda.", status: 400 };
+  }
+
+  const allowedTypes = new Set(["right", "wrong", "tr", "repeat"]);
+  const normalized: MarkingAnnotation[] = [];
+  for (const item of input) {
+    if (!item || typeof item !== "object") return { error: "Format tanda pemarkahan tidak sah.", status: 400 };
+    const row = item as Record<string, unknown>;
+    const start = row.start;
+    const end = row.end;
+    const text = row.text;
+    const type = row.type;
+    if (
+      !Number.isInteger(start) || !Number.isInteger(end) ||
+      typeof text !== "string" || typeof type !== "string" ||
+      !allowedTypes.has(type) ||
+      (start as number) < 0 || (end as number) <= (start as number) ||
+      (end as number) > answer.length ||
+      answer.slice(start as number, end as number) !== text ||
+      text.length > 1000
+    ) {
+      return { error: "Kedudukan atau teks tanda tidak sepadan dengan jawapan murid. Pilih semula perkataan yang hendak ditanda.", status: 400 };
+    }
+    normalized.push({
+      id: typeof row.id === "string" && row.id.length <= 100 ? row.id : crypto.randomUUID(),
+      start: start as number,
+      end: end as number,
+      text,
+      type: type as MarkingAnnotation["type"],
+      ...(typeof row.comment === "string" && row.comment.trim()
+        ? { comment: row.comment.trim().slice(0, 300) }
+        : {})
+    });
+  }
+
+  normalized.sort((a, b) => a.start - b.start || a.end - b.end);
+  for (let index = 1; index < normalized.length; index += 1) {
+    if (normalized[index].start < normalized[index - 1].end) {
+      return { error: "Tanda pemarkahan bertindih. Sila pilih semula frasa supaya setiap tanda berasingan.", status: 400 };
+    }
+  }
+
+  await updateRows(supabaseUrl, secretKey, "quiz_responses", {
+    id: "eq." + responseId
+  }, {
+    marking_annotations: normalized,
+    updated_at: new Date().toISOString()
+  });
+
+  return { saved: true, count: normalized.length, annotations: normalized };
+}
+
 async function gradeResponse(
   supabaseUrl: string,
   secretKey: string,
@@ -923,8 +1043,29 @@ Deno.serve(async (req: Request) => {
         id: "in.(" + historyQuizIds.join(",") + ")",
         limit: "500"
       }) : [];
+      const historyAttemptIds = historyAttempts.map((attempt) => String(attempt.id));
+      const historyResponses = historyAttemptIds.length ? await getRows(supabaseUrl, secretKey, "quiz_responses", {
+        select: "id,attempt_id,question_id,response_text,auto_score,teacher_score,feedback,marking_annotations",
+        attempt_id: "in.(" + historyAttemptIds.join(",") + ")",
+        limit: "2000"
+      }) : [];
+      const historyQuestionIds = [...new Set(historyResponses.map((row) => String(row.question_id)))];
+      const historyQuestions = historyQuestionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_questions", {
+        select: "id,question_order,question_type,prompt,marks",
+        id: "in.(" + historyQuestionIds.join(",") + ")",
+        limit: "1000"
+      }) : [];
+      const historyQuestionMap = new Map(historyQuestions.map((question) => [String(question.id), question]));
       result = {
-        attempts: historyAttempts,
+        attempts: historyAttempts.map((attempt) => ({
+          ...attempt,
+          responses: historyResponses
+            .filter((row) => String(row.attempt_id) === String(attempt.id))
+            .map((row) => ({
+              ...row,
+              question: historyQuestionMap.get(String(row.question_id)) ?? null
+            }))
+        })),
         quizzes: historyQuizzes
       };
     } else if (action === "start_attempt") {
@@ -1021,7 +1162,7 @@ Deno.serve(async (req: Request) => {
       }
       const attemptIds = visibleAttemptRows.map((a) => String(a.id));
       const responseRows = attemptIds.length ? await getRows(supabaseUrl, secretKey, "quiz_responses", {
-        select: "id,attempt_id,question_id,selected_option_id,response_text,auto_score,teacher_score,feedback",
+        select: "id,attempt_id,question_id,selected_option_id,response_text,auto_score,teacher_score,feedback,marking_annotations",
         attempt_id: "in.(" + attemptIds.join(",") + ")",
         limit: "2000"
       }) : [];
@@ -1079,6 +1220,11 @@ Deno.serve(async (req: Request) => {
         return send({ error: "ID kuiz atau soalan tidak sah." }, 400, origin);
       }
       result = await deleteQuestion(supabaseUrl, secretKey, body.quiz_id, body.question_id, profile, callerId);
+    } else if (action === "save_marking_annotations") {
+      if (typeof body.response_id !== "string") return send({ error: "ID jawapan tidak sah." }, 400, origin);
+      result = await saveMarkingAnnotations(
+        supabaseUrl, secretKey, body.response_id, profile, callerId, body.annotations
+      );
     } else if (action === "grade_response") {
       if (typeof body.response_id !== "string") return send({ error: "ID jawapan tidak sah." }, 400, origin);
       result = await gradeResponse(supabaseUrl, secretKey, body.response_id, profile, callerId, body.teacher_score, body.feedback);
