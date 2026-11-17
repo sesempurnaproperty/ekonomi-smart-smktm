@@ -643,7 +643,25 @@ Deno.serve(async (req: Request) => {
     const action = typeof body.action === "string" ? body.action : "";
     let result: JsonRecord;
 
-    if (action === "start_attempt") {
+    if (action === "student_score_history") {
+      if (profile.role !== "student") return send({ error: "Tindakan ini khusus untuk murid." }, 403, origin);
+      const historyAttempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
+        select: "id,quiz_id,attempt_number,status,total_score,max_score,objective_score,submitted_at,started_at,graded_at",
+        student_id: "eq." + callerId,
+        order: "started_at.desc",
+        limit: "1000"
+      });
+      const historyQuizIds = [...new Set(historyAttempts.map((attempt) => String(attempt.quiz_id)))];
+      const historyQuizzes = historyQuizIds.length ? await getRows(supabaseUrl, secretKey, "learning_quizzes", {
+        select: "id,title,description,target_form_level,attempt_limit,status",
+        id: "in.(" + historyQuizIds.join(",") + ")",
+        limit: "500"
+      }) : [];
+      result = {
+        attempts: historyAttempts,
+        quizzes: historyQuizzes
+      };
+    } else if (action === "start_attempt") {
       if (profile.role !== "student") return send({ error: "Tindakan ini khusus untuk murid." }, 403, origin);
       if (typeof body.quiz_id !== "string") return send({ error: "ID kuiz tidak sah." }, 400, origin);
       result = await startAttempt(supabaseUrl, secretKey, body.quiz_id, callerId, profile);
