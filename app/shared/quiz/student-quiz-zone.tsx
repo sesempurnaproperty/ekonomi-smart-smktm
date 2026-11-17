@@ -21,7 +21,7 @@ type ScoredResponse = {
   teacher_score:number|null;
   feedback:string|null;
   marking_annotations:MarkAnnotation[]|null;
-  question:{question_order:number;question_type:"objective"|"structured";prompt:string;marks:number}|null;
+  question:{question_order:number;question_type:"objective"|"structured";prompt:string;marks:number;image_path:string|null;image_url?:string|null}|null;
 };
 type Attempt = {
   id: string;
@@ -41,6 +41,8 @@ type Question = {
   question_type: "objective" | "structured";
   prompt: string;
   marks: number;
+  image_path: string | null;
+  image_url?: string | null;
   options: Option[];
 };
 type Active = {
@@ -132,7 +134,26 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
     historyQuizzes.forEach((quiz) => quizMap.set(quiz.id, quiz));
     availableQuizzes.forEach((quiz) => quizMap.set(quiz.id, quiz));
     setQuizzes([...quizMap.values()]);
-    setAttempts((historyResult.data?.attempts ?? []) as Attempt[]);
+
+    const historyAttempts = (historyResult.data?.attempts ?? []) as Attempt[];
+    const imagePaths = [...new Set(historyAttempts.flatMap(attempt =>
+      (attempt.responses ?? []).map(response=>response.question?.image_path??null)
+    ).filter((path):path is string=>typeof path==="string"&&path.length>0))];
+    const signedEntries = await Promise.all(imagePaths.map(async path=>{
+      const {data}=await supabase.storage.from("quiz-question-images").createSignedUrl(path,3600);
+      return [path,data?.signedUrl??null] as const;
+    }));
+    const signedMap = new Map(signedEntries.filter((entry):entry is readonly [string,string]=>Boolean(entry[1])));
+    setAttempts(historyAttempts.map(attempt=>({
+      ...attempt,
+      responses:(attempt.responses??[]).map(response=>({
+        ...response,
+        question:response.question?{
+          ...response.question,
+          image_url:response.question.image_path?signedMap.get(response.question.image_path)??null:null
+        }:null
+      }))
+    })));
     setLoading(false);
   }, [supabase]);
 
@@ -193,7 +214,20 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
       return;
     }
     const view = data as Active;
-    setActive(view);
+    const imagePaths = [...new Set(view.questions.map(question=>question.image_path).filter((path):path is string=>typeof path==="string"&&path.length>0))];
+    const signedEntries = await Promise.all(imagePaths.map(async path=>{
+      const {data:signed}=await supabase.storage.from("quiz-question-images").createSignedUrl(path,3600);
+      return [path,signed?.signedUrl??null] as const;
+    }));
+    const signedMap = new Map(signedEntries.filter((entry):entry is readonly [string,string]=>Boolean(entry[1])));
+    const viewWithImages:Active={
+      ...view,
+      questions:view.questions.map(question=>({
+        ...question,
+        image_url:question.image_path?signedMap.get(question.image_path)??null:null
+      }))
+    };
+    setActive(viewWithImages);
     const draft: Record<string, { selected_option_id?: string; response_text?: string }> = {};
     (view.draft_responses ?? []).forEach((row) => {
       draft[row.question_id] = {
@@ -391,7 +425,8 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
                                         <span>SOALAN {response.question?.question_order??index+1}</span>
                                         <span>{displayMark(response.teacher_score??0)} / {displayMark(response.question?.marks??0)} MARKAH STRUKTUR</span>
                                       </div>
-                                      <strong className={styles.studentMarkedQuestion}>{response.question?.prompt}</strong>
+                                      {response.question?.image_url?<img className={styles.studentQuestionImage} src={response.question.image_url} alt={"Gambar soalan "+(response.question.question_order??index+1)}/>:null}
+                                      {response.question?.prompt!=="Lihat gambar soalan"?<strong className={styles.studentMarkedQuestion}>{response.question?.prompt}</strong>:null}
                                       <div className={styles.studentMarkedAnswer}>{response.response_text?renderStudentMarkedAnswer(response.response_text,response.marking_annotations):"Tiada jawapan bertulis."}</div>
                                       {response.feedback?<p className={styles.studentMarkedFeedback}>Ulasan guru: {response.feedback}</p>:null}
                                     </article>
@@ -444,7 +479,8 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
                   <span>{question.marks} MARKAH</span>
                   <span>{question.question_type === "objective" ? "OBJEKTIF" : "STRUKTUR"}</span>
                 </div>
-                <h3>{question.prompt}</h3>
+                {question.image_url?<img className={styles.studentQuestionImage} src={question.image_url} alt={"Gambar soalan "+question.question_order}/>:null}
+                {question.prompt!=="Lihat gambar soalan"?<h3>{question.prompt}</h3>:null}
                 {question.question_type === "objective" ? (
                   <div className={styles.choiceList}>
                     {question.options.map((option) => (
