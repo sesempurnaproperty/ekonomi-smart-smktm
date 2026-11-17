@@ -10,6 +10,7 @@ type Quiz = {
   description: string | null;
   target_form_level: number | null;
   attempt_limit: number;
+  status: string;
 };
 type Attempt = {
   id: string;
@@ -80,22 +81,25 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
-    const [quizResult, attemptResult] = await Promise.all([
+    const [quizResult, historyResult] = await Promise.all([
       supabase.from("learning_quizzes")
-        .select("id,title,description,target_form_level,attempt_limit")
+        .select("id,title,description,target_form_level,attempt_limit,status")
         .eq("status", "published")
         .order("created_at", { ascending: false }),
-      supabase.from("quiz_attempts")
-        .select("id,quiz_id,attempt_number,status,total_score,max_score,objective_score,submitted_at")
-        .order("submitted_at", { ascending: false })
+      supabase.functions.invoke("quiz-engine", { body: { action: "student_score_history" } })
     ]);
-    if (quizResult.error || attemptResult.error) {
-      setError(quizResult.error?.message ?? attemptResult.error?.message ?? "Rekod kuiz gagal dimuatkan.");
+    if (quizResult.error || historyResult.error || historyResult.data?.error) {
+      setError(quizResult.error?.message ?? historyResult.error?.message ?? historyResult.data?.error ?? "Rekod kuiz gagal dimuatkan.");
       setLoading(false);
       return;
     }
-    setQuizzes((quizResult.data ?? []) as Quiz[]);
-    setAttempts((attemptResult.data ?? []) as Attempt[]);
+    const availableQuizzes = (quizResult.data ?? []) as Quiz[];
+    const historyQuizzes = (historyResult.data?.quizzes ?? []) as Quiz[];
+    const quizMap = new Map<string, Quiz>();
+    historyQuizzes.forEach((quiz) => quizMap.set(quiz.id, quiz));
+    availableQuizzes.forEach((quiz) => quizMap.set(quiz.id, quiz));
+    setQuizzes([...quizMap.values()]);
+    setAttempts((historyResult.data?.attempts ?? []) as Attempt[]);
     setLoading(false);
   }, [supabase]);
 
@@ -122,6 +126,11 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
       inProgressCount: rows.filter((attempt) => attempt.status === "in_progress").length
     };
   }), [quizzes, attempts]);
+
+  const availableQuizProgress = useMemo(
+    () => quizProgress.filter((item) => item.quiz.status === "published"),
+    [quizProgress]
+  );
 
   const scoreSummary = useMemo(() => {
     const assessed = quizProgress.filter((item) => item.best !== null);
@@ -411,11 +420,11 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
             </div>
             {loading ? (
               <div className={styles.emptyState}>Memuatkan senarai kuiz...</div>
-            ) : quizzes.length === 0 ? (
+            ) : availableQuizProgress.length === 0 ? (
               <div className={styles.emptyState}>Belum ada kuiz diterbitkan untuk akaun anda.</div>
             ) : (
               <div className={styles.quizGrid}>
-                {quizProgress.map((item) => {
+                {availableQuizProgress.map((item) => {
                   const activeAttempt = item.attempts.find((attempt) => attempt.status === "in_progress");
                   const full = !activeAttempt && item.attempts.length >= item.quiz.attempt_limit;
                   return (
