@@ -95,6 +95,29 @@ async function insertRows(
   return Array.isArray(data) ? data : [];
 }
 
+async function deleteRows(
+  supabaseUrl: string,
+  secretKey: string,
+  table: string,
+  query: Record<string, string>
+): Promise<JsonRecord[]> {
+  const url = withQuery(new URL("/rest/v1/" + table, supabaseUrl).toString(), query);
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      apikey: secretKey,
+      Accept: "application/json",
+      Prefer: "return=representation"
+    }
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(table + " delete failed: " + res.status + " " + body.slice(0, 400));
+  }
+  const data = await res.json().catch(() => []);
+  return Array.isArray(data) ? data : [];
+}
+
 async function updateRows(
   supabaseUrl: string,
   secretKey: string,
@@ -176,6 +199,246 @@ async function getQuestionsAndOptions(
     limit: "1200"
   });
   return { questions, options };
+}
+
+async function getManageableQuiz(
+  supabaseUrl: string,
+  secretKey: string,
+  quizId: string,
+  profile: JsonRecord,
+  callerId: string
+): Promise<{ quiz?: JsonRecord; assignedClassIds?: string[]; error?: string; status?: number }> {
+  if (!isStaff(profile)) {
+    return { error: "Akses guru atau pentadbir diperlukan.", status: 403 };
+  }
+
+  const quizRows = await getRows(supabaseUrl, secretKey, "learning_quizzes", {
+    select: "id,title,created_by,target_form_level,status",
+    id: "eq." + quizId,
+    limit: "1"
+  });
+  const quiz = quizRows[0];
+  if (!quiz) return { error: "Kuiz tidak ditemui.", status: 404 };
+
+  if (profile.role === "admin") return { quiz, assignedClassIds: [] };
+
+  if (String(quiz.created_by) !== callerId) {
+    return {
+      error: "Guru hanya boleh memadam atau menetapkan semula kuiz yang dicipta melalui akaun sendiri. Hubungi pentadbir untuk kuiz milik guru lain.",
+      status: 403
+    };
+  }
+
+  const assignments = await getRows(supabaseUrl, secretKey, "class_teacher_assignments", {
+    select: "class_id",
+    teacher_user_id: "eq." + callerId,
+    limit: "100"
+  });
+  const assignedClassIds = assignments.map((item) => String(item.class_id));
+  if (!assignedClassIds.length) {
+    return { error: "Tiada kelas yang ditugaskan kepada akaun guru ini.", status: 403 };
+  }
+
+  const assignedClasses = await getRows(supabaseUrl, secretKey, "academic_classes", {
+    select: "id,form_level",
+    id: "in.(" + assignedClassIds.join(",") + ")",
+    is_active: "eq.true",
+    limit: "100"
+  });
+  const assignedFormLevels = new Set(assignedClasses.map((item) => Number(item.form_level)));
+  if (
+    (quiz.target_form_level === 4 || quiz.target_form_level === 5) &&
+    !assignedFormLevels.has(Number(quiz.target_form_level))
+  ) {
+    return { error: "Kuiz ini bukan untuk tingkatan yang ditugaskan kepada akaun guru anda.", status: 403 };
+  }
+
+  return { quiz, assignedClassIds };
+}
+
+async function resetQuizAttempts(
+  supabaseUrl: string,
+  secretKey: string,
+  quizId: string,
+  profile: JsonRecord,
+  callerId: string
+) {
+  const access = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
+  if (!access.quiz) return { error: access.error ?? "Akses kuiz ditolak.", status: access.status ?? 403 };
+
+  const quizRows = await updateRows(supabaseUrl, secretKey, "learning_quizzes", {
+    id: "eq." + quizId
+  }, {
+    status: "draft",
+    updated_at: new Date().toISOString()
+  });
+  if (!quizRows.length) return { error: "Kuiz tidak dapat ditarik balik untuk proses reset.", status: 409 };
+
+  const allAttempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
+    select: "id,student_id,attempt_number",
+    quiz_id: "eq." + quizId,
+    limit: "2000"
+  });
+
+  let attemptsToDelete = allAttempts;
+  if (profile.role === "teacher") {
+    const assignedIds = new Set(access.assignedClassIds ?? []);
+    const studentIds = [...new Set(allAttempts.map((attempt) => String(attempt.student_id)))];
+    const students = studentIds.length ? await getRows(supabaseUrl, secretKey, "user_profiles", {
+      select: "user_id,academic_class_id,role",
+      user_id: "in.(" + studentIds.join(",") + ")",
+      limit: "2000"
+    }) : [];
+    const studentMap = new Map(students.map((student) => [String(student.user_id), student]));
+    attemptsToDelete = allAttempts.filter((attempt) => {
+      const student = studentMap.get(String(attempt.student_id));
+      return student?.role === "student" &&
+        student?.academic_class_id &&
+        assignedIds.has(String(student.academic_class_id));
+    });
+  }
+
+  const ids = attemptsToDelete.map((attempt) => String(attempt.id));
+  const deleted = ids.length
+    ? await deleteRows(supabaseUrl, secretKey, "quiz_attempts", { id: "in.(" + ids.join(",") + ")" })
+    : [];
+
+  return {
+    reset: true,
+    quiz_id: quizId,
+    deleted_attempts: deleted.length,
+    remaining_attempts: allAttempts.length - deleted.length,
+    unpublished: true,
+    message: profile.role === "teacher"
+      ? deleted.length + " percubaan daripada kelas yang ditugaskan telah direset. Kuiz ditarik balik dan perlu diterbitkan semula."
+      : deleted.length + " percubaan kuiz telah direset. Kuiz ditarik balik dan perlu diterbitkan semula."
+  };
+}
+
+async function deleteQuiz(
+  supabaseUrl: string,
+  secretKey: string,
+  quizId: string,
+  profile: JsonRecord,
+  callerId: string
+) {
+  const access = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
+  if (!access.quiz) return { error: access.error ?? "Akses kuiz ditolak.", status: access.status ?? 403 };
+
+  const allAttempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
+    select: "id,student_id",
+    quiz_id: "eq." + quizId,
+    limit: "2000"
+  });
+
+  if (profile.role === "teacher" && allAttempts.length) {
+    const assignedIds = new Set(access.assignedClassIds ?? []);
+    const studentIds = [...new Set(allAttempts.map((attempt) => String(attempt.student_id)))];
+    const students = studentIds.length ? await getRows(supabaseUrl, secretKey, "user_profiles", {
+      select: "user_id,academic_class_id,role",
+      user_id: "in.(" + studentIds.join(",") + ")",
+      limit: "2000"
+    }) : [];
+    const studentMap = new Map(students.map((student) => [String(student.user_id), student]));
+    const outside = allAttempts.filter((attempt) => {
+      const student = studentMap.get(String(attempt.student_id));
+      return !student?.academic_class_id || !assignedIds.has(String(student.academic_class_id));
+    });
+    if (outside.length) {
+      return {
+        error: "Kuiz ini mempunyai percubaan daripada kelas di luar penugasan anda. Hanya pentadbir boleh memadam kuiz yang melibatkan kelas lain.",
+        status: 403
+      };
+    }
+  }
+
+  const unpublished = await updateRows(supabaseUrl, secretKey, "learning_quizzes", {
+    id: "eq." + quizId
+  }, {
+    status: "draft",
+    updated_at: new Date().toISOString()
+  });
+  if (!unpublished.length) return { error: "Kuiz tidak dapat ditarik balik sebelum dipadam.", status: 409 };
+
+  if (allAttempts.length) {
+    await deleteRows(supabaseUrl, secretKey, "quiz_attempts", { quiz_id: "eq." + quizId });
+  }
+
+  const deleted = await deleteRows(supabaseUrl, secretKey, "learning_quizzes", { id: "eq." + quizId });
+  if (!deleted.length) {
+    return { error: "Percubaan telah direset tetapi kuiz tidak dapat dipadam. Kuiz kini berstatus draf; cuba semula atau hubungi pentadbir.", status: 409 };
+  }
+
+  return {
+    deleted: true,
+    quiz_id: quizId,
+    title: String(access.quiz.title ?? ""),
+    deleted_attempts: allAttempts.length,
+    message: "Kuiz, semua soalan, pilihan jawapan, kunci jawapan dan rekod percubaan telah dipadam."
+  };
+}
+
+async function deleteQuestion(
+  supabaseUrl: string,
+  secretKey: string,
+  quizId: string,
+  questionId: string,
+  profile: JsonRecord,
+  callerId: string
+) {
+  const access = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
+  if (!access.quiz) return { error: access.error ?? "Akses kuiz ditolak.", status: access.status ?? 403 };
+  if (access.quiz.status === "published") {
+    return { error: "Tarik balik penerbitan kuiz terlebih dahulu sebelum memadam soalan.", status: 409 };
+  }
+
+  const questionRows = await getRows(supabaseUrl, secretKey, "quiz_questions", {
+    select: "id,question_order",
+    id: "eq." + questionId,
+    quiz_id: "eq." + quizId,
+    limit: "1"
+  });
+  const question = questionRows[0];
+  if (!question) return { error: "Soalan tidak ditemui dalam kuiz ini.", status: 404 };
+
+  const attempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
+    select: "id",
+    quiz_id: "eq." + quizId,
+    limit: "2000"
+  });
+  if (attempts.length) {
+    return {
+      error: "Masih terdapat " + attempts.length + " percubaan murid. Reset percubaan kuiz terlebih dahulu. Jika percubaan kelas lain masih wujud, pentadbir perlu membuat reset penuh sebelum soalan boleh dipadam.",
+      status: 409
+    };
+  }
+
+  const deleted = await deleteRows(supabaseUrl, secretKey, "quiz_questions", {
+    id: "eq." + questionId,
+    quiz_id: "eq." + quizId
+  });
+  if (!deleted.length) return { error: "Soalan gagal dipadam.", status: 409 };
+
+  const remaining = await getRows(supabaseUrl, secretKey, "quiz_questions", {
+    select: "id,question_order",
+    quiz_id: "eq." + quizId,
+    order: "question_order.asc",
+    limit: "500"
+  });
+  for (let index = 0; index < remaining.length; index += 1) {
+    if (Number(remaining[index].question_order) !== index + 1) {
+      await updateRows(supabaseUrl, secretKey, "quiz_questions", {
+        id: "eq." + String(remaining[index].id)
+      }, { question_order: index + 1, updated_at: new Date().toISOString() });
+    }
+  }
+
+  return {
+    deleted: true,
+    question_id: questionId,
+    remaining_questions: remaining.length,
+    message: "Soalan berjaya dipadam. Nombor soalan telah disusun semula."
+  };
 }
 
 async function studentCanTakeQuiz(
@@ -802,6 +1065,17 @@ Deno.serve(async (req: Request) => {
             }))
         }))
       };
+    } else if (action === "reset_quiz_attempts") {
+      if (typeof body.quiz_id !== "string") return send({ error: "ID kuiz tidak sah." }, 400, origin);
+      result = await resetQuizAttempts(supabaseUrl, secretKey, body.quiz_id, profile, callerId);
+    } else if (action === "delete_quiz") {
+      if (typeof body.quiz_id !== "string") return send({ error: "ID kuiz tidak sah." }, 400, origin);
+      result = await deleteQuiz(supabaseUrl, secretKey, body.quiz_id, profile, callerId);
+    } else if (action === "delete_question") {
+      if (typeof body.quiz_id !== "string" || typeof body.question_id !== "string") {
+        return send({ error: "ID kuiz atau soalan tidak sah." }, 400, origin);
+      }
+      result = await deleteQuestion(supabaseUrl, secretKey, body.quiz_id, body.question_id, profile, callerId);
     } else if (action === "grade_response") {
       if (typeof body.response_id !== "string") return send({ error: "ID jawapan tidak sah." }, 400, origin);
       result = await gradeResponse(supabaseUrl, secretKey, body.response_id, profile, callerId, body.teacher_score, body.feedback);
