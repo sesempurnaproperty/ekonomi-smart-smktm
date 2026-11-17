@@ -679,24 +679,60 @@ Deno.serve(async (req: Request) => {
         limit: "500"
       });
       const studentIds = [...new Set(attemptRows.map((a) => String(a.student_id)))];
-      const profileRows = studentIds.length ? await getRows(supabaseUrl, secretKey, "user_profiles", {
-        select: "user_id,full_name,form_level,class_name,academic_class_id",
-        user_id: "in.(" + studentIds.join(",") + ")",
-        limit: "500"
-      }) : [];
-      const profileMap = new Map(profileRows.map((p) => [String(p.user_id), p]));
-      let visibleAttemptRows = attemptRows;
+      const [quizRows, attemptProfileRows] = await Promise.all([
+        getRows(supabaseUrl, secretKey, "learning_quizzes", {
+          select: "id,target_form_level,chapter_id",
+          id: "eq." + body.quiz_id,
+          limit: "1"
+        }),
+        studentIds.length ? getRows(supabaseUrl, secretKey, "user_profiles", {
+          select: "user_id,full_name,form_level,class_name,academic_class_id,is_active",
+          user_id: "in.(" + studentIds.join(",") + ")",
+          limit: "500"
+        }) : Promise.resolve([])
+      ]);
+      const selectedQuiz = quizRows[0] ?? null;
+      const attemptProfileMap = new Map(attemptProfileRows.map((p) => [String(p.user_id), p]));
+
+      let assignedClassIds: string[] = [];
       if (profile.role === "teacher") {
         const assignments = await getRows(supabaseUrl, secretKey, "class_teacher_assignments", {
           select: "class_id",
           teacher_user_id: "eq." + callerId,
           limit: "100"
         });
-        const assignedClassIds = new Set(assignments.map((item) => String(item.class_id)));
+        assignedClassIds = assignments.map((item) => String(item.class_id));
+      }
+
+      let rosterRows: JsonRecord[] = [];
+      if (profile.role === "teacher" && assignedClassIds.length === 0) {
+        rosterRows = [];
+      } else {
+        const rosterQuery: Record<string, string> = {
+          select: "user_id,full_name,form_level,class_name,academic_class_id,is_active",
+          role: "eq.student",
+          is_active: "eq.true",
+          order: "form_level.asc,class_name.asc,full_name.asc",
+          limit: "2000"
+        };
+        if (profile.role === "teacher") {
+          rosterQuery.academic_class_id = "in.(" + assignedClassIds.join(",") + ")";
+        }
+        if (selectedQuiz?.target_form_level === 4 || selectedQuiz?.target_form_level === 5) {
+          rosterQuery.form_level = "eq." + String(selectedQuiz.target_form_level);
+        }
+        rosterRows = await getRows(supabaseUrl, secretKey, "user_profiles", rosterQuery);
+      }
+
+      const rosterMap = new Map(rosterRows.map((p) => [String(p.user_id), p]));
+      const profileMap = new Map([...attemptProfileMap, ...rosterMap]);
+      let visibleAttemptRows = attemptRows;
+      if (profile.role === "teacher") {
+        const assignedClassSet = new Set(assignedClassIds);
         visibleAttemptRows = attemptRows.filter((attempt) => {
           const student = profileMap.get(String(attempt.student_id));
           return Boolean(student?.is_active !== false && student?.academic_class_id &&
-            assignedClassIds.has(String(student.academic_class_id)));
+            assignedClassSet.has(String(student.academic_class_id)));
         });
       }
       const attemptIds = visibleAttemptRows.map((a) => String(a.id));
@@ -729,6 +765,13 @@ Deno.serve(async (req: Request) => {
       }]));
       const optionMap = new Map(optionRows.map((o) => [String(o.id), o]));
       result = {
+        students: rosterRows.map((student) => ({
+          user_id: student.user_id,
+          full_name: student.full_name,
+          form_level: student.form_level,
+          class_name: student.class_name,
+          academic_class_id: student.academic_class_id
+        })),
         attempts: visibleAttemptRows.map((attempt) => ({
           ...attempt,
           student: profileMap.get(String(attempt.student_id)) ?? null,
