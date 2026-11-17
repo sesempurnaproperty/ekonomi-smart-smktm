@@ -710,3 +710,101 @@ mark.studentMarkRepeat { background:#e8e4fb; color:#55448d; text-decoration:unde
   .studentAttemptDetails > summary { align-items:flex-start; }
   .studentAttemptDetails .studentAttemptRow { flex-direction:row; }
 }
+
+
+/* Image-based quiz question support */
+.questionImageUploader {
+  grid-column:1/-1;
+  display:grid;
+  gap:12px;
+  padding:14px;
+  border:1px dashed #b9d8c5;
+  border-radius:11px;
+  background:#f5faf6;
+}
+.questionImageUploadCopy {
+  display:grid;
+  gap:5px;
+}
+.questionImageUploadCopy strong {
+  color:#244b3b;
+  font-size:11px;
+}
+.questionImageUploadCopy span {
+  color:#71877a;
+  font-size:9px;
+  line-height:1.55;
+}
+.questionImageUploadCopy small {
+  color:#87978d;
+  font-size:8px;
+}
+.imageUploadButton {
+  display:inline-flex!important;
+  align-items:center;
+  justify-content:center;
+  justify-self:start;
+  min-height:38px;
+  padding:9px 14px;
+  border:1px solid #c9e2d1;
+  border-radius:8px;
+  background:#eaf6ed;
+  color:#176b4b!important;
+  cursor:pointer;
+  font-size:9px!important;
+  font-weight:900!important;
+}
+.imageUploadButton input {
+  display:none;
+}
+.questionImageLocalPreview {
+  display:grid;
+  justify-items:start;
+  gap:8px;
+  max-width:100%;
+}
+.questionImageLocalPreview img {
+  display:block;
+  max-width:100%;
+  max-height:280px;
+  object-fit:contain;
+  border:1px solid #dce9df;
+  border-radius:9px;
+  background:#fff;
+}
+.removeQuestionImageButton {
+  min-height:29px;
+  padding:6px 10px;
+  border:1px solid #f0d2cd;
+  border-radius:6px;
+  background:#fff5f3;
+  color:#a3483d;
+  cursor:pointer;
+  font:inherit;
+  font-size:8px;
+  font-weight:900;
+}
+.questionImagePreview,.studentQuestionImage {
+  display:block;
+  width:100%;
+  max-height:460px;
+  margin:10px 0 12px;
+  padding:6px;
+  object-fit:contain;
+  border:1px solid #e1ebe3;
+  border-radius:10px;
+  background:#f8fbf8;
+}
+.studentQuestionImage {
+  max-height:520px;
+  margin:0 0 14px;
+  background:#fff;
+}
+@media(max-width:620px) {
+  .questionImageUploader { padding:11px; }
+  .imageUploadButton { width:100%; }
+  .questionImagePreview,.studentQuestionImage {
+    max-height:360px;
+    padding:3px;
+  }
+}
