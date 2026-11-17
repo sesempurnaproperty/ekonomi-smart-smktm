@@ -497,6 +497,7 @@ async function gradeResponse(
   secretKey: string,
   responseId: string,
   profile: JsonRecord,
+  callerId: string,
   scoreValue: unknown,
   feedbackValue: unknown
 ) {
@@ -508,6 +509,36 @@ async function gradeResponse(
   });
   const responseRow = responseRows[0];
   if (!responseRow) return { error: "Jawapan murid tidak ditemui.", status: 404 };
+
+  if (profile.role === "teacher") {
+    const attemptRows = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
+      select: "id,student_id",
+      id: "eq." + String(responseRow.attempt_id),
+      limit: "1"
+    });
+    const attempt = attemptRows[0];
+    if (!attempt) return { error: "Percubaan murid tidak ditemui.", status: 404 };
+
+    const studentRows = await getRows(supabaseUrl, secretKey, "user_profiles", {
+      select: "user_id,academic_class_id,is_active,role",
+      user_id: "eq." + String(attempt.student_id),
+      limit: "1"
+    });
+    const student = studentRows[0];
+    if (!student || student.role !== "student" || student.is_active !== true || !student.academic_class_id) {
+      return { error: "Murid ini tidak mempunyai kelas aktif yang sah.", status: 403 };
+    }
+
+    const assignments = await getRows(supabaseUrl, secretKey, "class_teacher_assignments", {
+      select: "class_id",
+      teacher_user_id: "eq." + callerId,
+      class_id: "eq." + String(student.academic_class_id),
+      limit: "1"
+    });
+    if (!assignments.length) {
+      return { error: "Akses ditolak. Skrip ini bukan daripada kelas yang ditugaskan kepada anda.", status: 403 };
+    }
+  }
 
   const questions = await getRows(supabaseUrl, secretKey, "quiz_questions", {
     select: "id,question_type,marks",
@@ -649,11 +680,26 @@ Deno.serve(async (req: Request) => {
       });
       const studentIds = [...new Set(attemptRows.map((a) => String(a.student_id)))];
       const profileRows = studentIds.length ? await getRows(supabaseUrl, secretKey, "user_profiles", {
-        select: "user_id,full_name,form_level,class_name",
+        select: "user_id,full_name,form_level,class_name,academic_class_id",
         user_id: "in.(" + studentIds.join(",") + ")",
         limit: "500"
       }) : [];
-      const attemptIds = attemptRows.map((a) => String(a.id));
+      const profileMap = new Map(profileRows.map((p) => [String(p.user_id), p]));
+      let visibleAttemptRows = attemptRows;
+      if (profile.role === "teacher") {
+        const assignments = await getRows(supabaseUrl, secretKey, "class_teacher_assignments", {
+          select: "class_id",
+          teacher_user_id: "eq." + callerId,
+          limit: "100"
+        });
+        const assignedClassIds = new Set(assignments.map((item) => String(item.class_id)));
+        visibleAttemptRows = attemptRows.filter((attempt) => {
+          const student = profileMap.get(String(attempt.student_id));
+          return Boolean(student?.is_active !== false && student?.academic_class_id &&
+            assignedClassIds.has(String(student.academic_class_id)));
+        });
+      }
+      const attemptIds = visibleAttemptRows.map((a) => String(a.id));
       const responseRows = attemptIds.length ? await getRows(supabaseUrl, secretKey, "quiz_responses", {
         select: "id,attempt_id,question_id,selected_option_id,response_text,auto_score,teacher_score,feedback",
         attempt_id: "in.(" + attemptIds.join(",") + ")",
@@ -677,14 +723,13 @@ Deno.serve(async (req: Request) => {
         id: "in.(" + optionIds.join(",") + ")",
         limit: "1000"
       }) : [];
-      const profileMap = new Map(profileRows.map((p) => [String(p.user_id), p]));
       const questionMap = new Map(questionRows.map((q) => [String(q.id), {
         ...q,
         marking_guide: guideMap.get(String(q.id)) ?? null
       }]));
       const optionMap = new Map(optionRows.map((o) => [String(o.id), o]));
       result = {
-        attempts: attemptRows.map((attempt) => ({
+        attempts: visibleAttemptRows.map((attempt) => ({
           ...attempt,
           student: profileMap.get(String(attempt.student_id)) ?? null,
           responses: responseRows
@@ -698,7 +743,7 @@ Deno.serve(async (req: Request) => {
       };
     } else if (action === "grade_response") {
       if (typeof body.response_id !== "string") return send({ error: "ID jawapan tidak sah." }, 400, origin);
-      result = await gradeResponse(supabaseUrl, secretKey, body.response_id, profile, body.teacher_score, body.feedback);
+      result = await gradeResponse(supabaseUrl, secretKey, body.response_id, profile, callerId, body.teacher_score, body.feedback);
     } else {
       return send({ error: "Tindakan tidak dikenali." }, 400, origin);
     }
