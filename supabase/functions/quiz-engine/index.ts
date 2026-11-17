@@ -303,14 +303,17 @@ async function resetQuizAttempts(
     ? await deleteRows(supabaseUrl, secretKey, "quiz_attempts", { id: "in.(" + ids.join(",") + ")" })
     : [];
 
+  const remainingAttempts = allAttempts.length - deleted.length;
   return {
     reset: true,
     quiz_id: quizId,
     deleted_attempts: deleted.length,
-    remaining_attempts: allAttempts.length - deleted.length,
+    remaining_attempts: remainingAttempts,
     unpublished: true,
     message: profile.role === "teacher"
-      ? deleted.length + " percubaan daripada kelas yang ditugaskan telah direset. Kuiz ditarik balik dan perlu diterbitkan semula."
+      ? deleted.length + " percubaan daripada kelas yang ditugaskan telah direset." +
+        (remainingAttempts > 0 ? " " + remainingAttempts + " percubaan daripada kelas lain dikekalkan." : "") +
+        " Kuiz ditarik balik dan perlu diterbitkan semula."
       : deleted.length + " percubaan kuiz telah direset. Kuiz ditarik balik dan perlu diterbitkan semula."
   };
 }
