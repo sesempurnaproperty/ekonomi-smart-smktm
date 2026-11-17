@@ -22,7 +22,7 @@ function renderMarkedAnswer(text:string,annotations:MarkAnnotation[]|null|undefi
  valid.forEach((a)=>{
   if(a.start<cursor)return;
   if(a.start>cursor)nodes.push(<Fragment key={"plain-"+cursor}>{text.slice(cursor,a.start)}</Fragment>);
-  const cls=a.type==="right"? "annotationRight":a.type==="wrong"?"annotationWrong":a.type==="tr"?"annotationTR":"annotationRepeat";
+  const cls=a.type==="right"?styles.annotationRight:a.type==="wrong"?styles.annotationWrong:a.type==="tr"?styles.annotationTR:styles.annotationRepeat;
   nodes.push(<mark key={a.id} className={cls} title={MARK_TYPES.find(x=>x.type===a.type)?.label}>{a.text}</mark>);
   if(showSymbols)nodes.push(<span key={"symbol-"+a.id} className={"annotationSymbol "+cls}>{MARK_TYPES.find(x=>x.type===a.type)?.symbol}</span>);
   cursor=a.end;
@@ -227,12 +227,12 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   </div>
   {selectedRanges[r.id]?<div className={styles.selectedPhrase}>Dipilih: “{selectedRanges[r.id].text}”</div>:<div className={styles.selectionHint}>Tiada teks dipilih. Seret tetikus pada perkataan yang membawa markah atau kesalahan.</div>}
   <div className={styles.markingToolButtons}>
-   {MARK_TYPES.map(mark=><button key={mark.type} type="button" className={"markingToolButton "+("markingTool"+mark.type)} disabled={!selectedRanges[r.id]||busy} title={mark.label} onClick={()=>addAnnotation(r.id,mark.type)}>
+   {MARK_TYPES.map(mark=><button key={mark.type} type="button" className={styles.markingToolButton+" "+styles["markingTool"+mark.type]} disabled={!selectedRanges[r.id]||busy} title={mark.label} onClick={()=>addAnnotation(r.id,mark.type)}>
     <strong>{mark.symbol}</strong><span>{mark.label}</span>
    </button>)}
   </div>
   {(annotationDrafts[r.id]??[]).length>0?<div className={styles.markingAnnotationList}>
-   {(annotationDrafts[r.id]??[]).map(mark=><span className={"markingAnnotationChip markingChip"+mark.type} key={mark.id}>
+   {(annotationDrafts[r.id]??[]).map(mark=><span className={styles.markingAnnotationChip+" "+styles["markingChip"+mark.type]} key={mark.id}>
     <strong>{MARK_TYPES.find(x=>x.type===mark.type)?.symbol}</strong> {mark.text}
     <button type="button" aria-label={"Buang tanda "+mark.text} disabled={busy} onClick={()=>removeAnnotation(r.id,mark.id)}>×</button>
    </span>)}
