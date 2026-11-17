@@ -66,14 +66,7 @@ using (
           p.role='teacher'
           and (
             q.created_by=p.user_id
-            or exists (
-              select 1
-              from public.class_teacher_assignments a
-              join public.academic_classes c on c.id=a.class_id
-              where a.teacher_user_id=p.user_id
-                and c.is_active=true
-                and (q.target_form_level is null or c.form_level=q.target_form_level)
-            )
+            or q.created_by=p.user_id
           )
         )
         or (
