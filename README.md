@@ -132,3 +132,15 @@ Guru boleh memilih teks pada jawapan struktur murid dan menambah salah satu tand
 Tanda disimpan sebagai anotasi pada respons asal, termasuk kedudukan aksara dan teks yang dipilih. Sistem menolak tanda yang tidak sepadan dengan teks asal atau bertindih dengan tanda lain. Guru boleh membuang tanda dalam draf sebelum menyimpan.
 Murid boleh membuka sejarah setiap percubaan di ruang Latihan dan Kuiz untuk melihat jawapan struktur, simbol guru, markah dan ulasan. Kunci jawapan dan panduan pemarkahan tidak dipaparkan kepada murid.
 Semua tindakan simpan tanda diperiksa di Edge Function; guru hanya boleh menanda jawapan murid daripada kelas yang ditugaskan kepada akaunnya.
+
+
+## Soalan kuiz berasaskan imej
+
+- Setiap soalan boleh menggunakan teks, imej sahaja atau gabungan imej dan arahan teks.
+- Guru boleh memuat naik JPG, PNG atau WebP sehingga 5 MB bagi satu gambar soalan.
+- Soalan objektif masih menggunakan pilihan A-D dan kunci jawapan automatik; soalan struktur masih menggunakan panduan pemarkahan manual.
+- Gambar disimpan dalam bucket Supabase Storage private `quiz-question-images`, dengan laluan disusun mengikut ID kuiz.
+- Pautan imej ditandatangani untuk tempoh terhad. Murid hanya dibenarkan membaca gambar kuiz yang diterbitkan kepada tingkatan mereka atau kuiz yang pernah mereka sertai.
+- Guru boleh membaca gambar kuiz milik sendiri atau kuiz bagi tingkatan kelas yang ditugaskan; pentadbir boleh membaca semua gambar.
+- Gambar dipaparkan dalam pembina kuiz, ruang menjawab murid, sejarah skrip murid dan semakan guru.
+- Apabila soalan atau keseluruhan kuiz dipadam, Edge Function turut memadam fail imej berkaitannya melalui Storage API.
