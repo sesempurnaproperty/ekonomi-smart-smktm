@@ -3,13 +3,15 @@ import Link from "next/link";
 import {Fragment,FormEvent,useCallback,useEffect,useMemo,useRef,useState,type ReactNode} from "react";
 import {createClient} from "../../../lib/supabase/client";
 import styles from "./quiz.module.css";
-type Quiz={id:string;title:string;description:string|null;target_form_level:number|null;chapter_id:string|null;attempt_limit:number;status:string};
+type Quiz={id:string;title:string;description:string|null;target_form_level:number|null;chapter_id:string|null;syllabus_chapter_id:string;attempt_limit:number;status:string};
 type Chapter={id:string;form_level:number;chapter_number:number;title:string};
-type Question={id:string;quiz_id:string;question_order:number;question_type:"objective"|"structured";prompt:string;marks:number;image_path:string|null;image_url?:string|null};
+type SyllabusChapter={id:string;chapter_number:number;title:string;display_order:number};
+type SyllabusTopic={id:string;chapter_id:string;topic_code:string;title:string;display_order:number};
+type Question={id:string;quiz_id:string;question_order:number;question_type:"objective"|"structured";prompt:string;marks:number;image_path:string|null;image_url?:string|null;syllabus_topic_id:string};
 type Option={id:string;question_id:string;option_code:string;option_text:string;option_order:number};
 type MarkType="right"|"wrong"|"tr"|"repeat";
 type MarkAnnotation={id:string;start:number;end:number;text:string;type:MarkType;comment?:string};
-type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;auto_score:number|null;teacher_score:number|null;feedback:string|null;marking_annotations?:MarkAnnotation[]|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null;image_path:string|null;image_url?:string|null}|null};
+type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;auto_score:number|null;teacher_score:number|null;feedback:string|null;marking_annotations?:MarkAnnotation[]|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null;image_path:string|null;image_url?:string|null;syllabus_topic_id:string}|null};
 const MARK_TYPES:{type:MarkType;symbol:string;label:string}[]=[
  {type:"right",symbol:"✓",label:"Mengandungi markah"},
  {type:"wrong",symbol:"✗",label:"Jawapan salah"},
@@ -32,18 +34,40 @@ function renderMarkedAnswer(text:string,annotations:MarkAnnotation[]|null|undefi
 }
 type A={id:string;student_id:string;attempt_number:number;status:string;total_score:number;max_score:number;student:{full_name:string;form_level:number;class_name:string}|null;responses:R[]};
 type StudentRoster={user_id:string;full_name:string;form_level:number;class_name:string;academic_class_id:string};
-const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:"",imageFile:null as File|null,imagePreviewUrl:""};
+const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:"",syllabusTopicId:"",imageFile:null as File|null,imagePreviewUrl:""};
 export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:string;roleLabel:string}){
- const s=useMemo(()=>createClient(),[]);const [uid,setUid]=useState("");const [quizzes,setQuizzes]=useState<Quiz[]>([]);const [chapters,setChapters]=useState<Chapter[]>([]);
+ const s=useMemo(()=>createClient(),[]);const [uid,setUid]=useState("");const [quizzes,setQuizzes]=useState<Quiz[]>([]);const [chapters,setChapters]=useState<Chapter[]>([]);const [syllabusChapters,setSyllabusChapters]=useState<SyllabusChapter[]>([]);const [syllabusTopics,setSyllabusTopics]=useState<SyllabusTopic[]>([]);
  const [quizId,setQuizId]=useState("");const [questions,setQuestions]=useState<Question[]>([]);const [options,setOptions]=useState<Option[]>([]);const [attempts,setAttempts]=useState<A[]>([]);const [attemptId,setAttemptId]=useState("");const [roster,setRoster]=useState<StudentRoster[]>([]);
- const [qf,setQf]=useState({title:"",description:"",target:"all",chapter_id:"",limit:"1"});const [form,setForm]=useState(fresh);
+ const [qf,setQf]=useState({title:"",description:"",target:"all",chapter_id:"",syllabus_chapter_id:"",limit:"1"});const [form,setForm]=useState(fresh);
  const [grades,setGrades]=useState<Record<string,{score:string;feedback:string}>>({});
  const [annotationDrafts,setAnnotationDrafts]=useState<Record<string,MarkAnnotation[]>>({});
  const [selectedRanges,setSelectedRanges]=useState<Record<string,{start:number;end:number;text:string}>>({});
  const answerRefs=useRef<Record<string,HTMLDivElement|null>>({});
  const imageInputRef=useRef<HTMLInputElement|null>(null);
  const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [notice,setNotice]=useState("");
- const refresh=useCallback(async()=>{setLoading(true);const [u,q,c]=await Promise.all([s.auth.getUser(),s.from("learning_quizzes").select("*").order("created_at",{ascending:false}),s.from("learning_chapters").select("id,form_level,chapter_number,title").order("form_level").order("chapter_number")]);if(u.error||!u.data.user){setError("Sesi tidak sah.");setLoading(false);return;}if(q.error||c.error){setError(q.error?.message??c.error?.message??"Gagal memuatkan data.");setLoading(false);return;}setUid(u.data.user.id);const rows=(q.data??[]) as Quiz[];setQuizzes(rows);setChapters((c.data??[]) as Chapter[]);setQuizId(x=>x&&rows.some(q=>q.id===x)?x:rows[0]?.id??"");setLoading(false);},[s]);
+ const refresh=useCallback(async()=>{
+  setLoading(true);
+  const [u,q,c,sc,st]=await Promise.all([
+   s.auth.getUser(),
+   s.from("learning_quizzes").select("*").order("created_at",{ascending:false}),
+   s.from("learning_chapters").select("id,form_level,chapter_number,title").order("form_level").order("chapter_number"),
+   s.from("syllabus_chapters").select("id,chapter_number,title,display_order").eq("is_active",true).order("display_order"),
+   s.from("syllabus_topics").select("id,chapter_id,topic_code,title,display_order").eq("is_active",true).order("display_order")
+  ]);
+  if(u.error||!u.data.user){setError("Sesi tidak sah.");setLoading(false);return;}
+  if(q.error||c.error||sc.error||st.error){
+   setError(q.error?.message??c.error?.message??sc.error?.message??st.error?.message??"Gagal memuatkan data.");
+   setLoading(false);return;
+  }
+  setUid(u.data.user.id);
+  const rows=(q.data??[]) as Quiz[];
+  setQuizzes(rows);
+  setChapters((c.data??[]) as Chapter[]);
+  setSyllabusChapters((sc.data??[]) as SyllabusChapter[]);
+  setSyllabusTopics((st.data??[]) as SyllabusTopic[]);
+  setQuizId(x=>x&&rows.some(q=>q.id===x)?x:rows[0]?.id??"");
+  setLoading(false);
+ },[s]);
  useEffect(()=>{void refresh();},[refresh]);
  useEffect(()=>()=>{if(form.imagePreviewUrl)URL.revokeObjectURL(form.imagePreviewUrl);},[form.imagePreviewUrl]);
  const detail=useCallback(async()=>{
@@ -126,7 +150,25 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  const bestCollected=studentSummaries.reduce((sum,x)=>sum+Number(x.best?.total_score??0),0);
  const bestMaximum=studentSummaries.reduce((sum,x)=>sum+Number(x.best?.max_score??0),0);
  const quizStatusLabel=(status:string)=>status==="graded"?"SELESAI DINILAI":status==="pending_review"?"MENUNGGU SEMAKAN":"SEDANG MENJAWAB";
- async function createQuiz(e:FormEvent){e.preventDefault();setBusy(true);setError("");const {data,error:err}=await s.from("learning_quizzes").insert({title:qf.title.trim(),description:qf.description.trim()||null,target_form_level:qf.target==="all"?null:Number(qf.target),chapter_id:qf.chapter_id||null,attempt_limit:Number(qf.limit),created_by:uid,status:"draft"}).select("*").single();setBusy(false);if(err||!data){setError(err?.message??"Kuiz gagal dicipta.");return;}setQf({title:"",description:"",target:"all",chapter_id:"",limit:"1"});setQuizId(data.id);setNotice("Kuiz dicipta sebagai draf.");await refresh();}
+ async function createQuiz(e:FormEvent){
+  e.preventDefault();
+  if(!qf.syllabus_chapter_id){setError("Pilih bab silibus sebelum mencipta kuiz.");return;}
+  setBusy(true);setError("");
+  const {data,error:err}=await s.from("learning_quizzes").insert({
+   title:qf.title.trim(),
+   description:qf.description.trim()||null,
+   target_form_level:qf.target==="all"?null:Number(qf.target),
+   chapter_id:qf.chapter_id||null,
+   syllabus_chapter_id:qf.syllabus_chapter_id,
+   attempt_limit:Number(qf.limit),
+   created_by:uid,status:"draft"
+  }).select("*").single();
+  setBusy(false);
+  if(err||!data){setError(err?.message??"Kuiz gagal dicipta.");return;}
+  setQf({title:"",description:"",target:"all",chapter_id:"",syllabus_chapter_id:"",limit:"1"});
+  setQuizId(data.id);setNotice("Kuiz dicipta sebagai draf di bawah bab silibus yang dipilih.");
+  await refresh();
+ }
  function chooseQuestionImage(file:File|null){
   if(!file)return;
   const allowed=["image/jpeg","image/png","image/webp"];
@@ -151,6 +193,10 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
 
  async function addQuestion(e:FormEvent){
   e.preventDefault();
+  if(!form.syllabusTopicId){
+   setError("Pilih Bab kecil / subbab silibus untuk soalan ini.");
+   return;
+  }
   if(!form.prompt.trim()&&!form.imageFile){
    setError("Taip pernyataan soalan atau muat naik gambar soalan.");
    return;
@@ -180,7 +226,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     question_type:form.kind,
     prompt:form.prompt.trim()||(imagePath?"Lihat gambar soalan":""),
     marks:Number(form.marks),
-    image_path:imagePath
+    image_path:imagePath,
+    syllabus_topic_id:form.syllabusTopicId
    }).select("*").single();
    if(qErr||!q)throw new Error(qErr?.message??"Soalan gagal disimpan.");
    createdQuestionId=q.id;
@@ -325,9 +372,9 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  <label className={styles.fullWidth}>Tajuk kuiz<input required value={qf.title} onChange={e=>setQf({...qf,title:e.target.value})} placeholder="Contoh: Latihan Bab 1"/></label><label className={styles.fullWidth}>Penerangan<textarea rows={2} value={qf.description} onChange={e=>setQf({...qf,description:e.target.value})}/></label>
  <label>Sasaran<select value={qf.target} onChange={e=>setQf({...qf,target:e.target.value})}><option value="all">Tingkatan 4 dan 5</option><option value="4">Tingkatan 4</option><option value="5">Tingkatan 5</option></select></label>
  <label>Had percubaan<select value={qf.limit} onChange={e=>setQf({...qf,limit:e.target.value})}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n} kali</option>)}</select></label>
- <label className={styles.fullWidth}>Bab berkaitan<select value={qf.chapter_id} onChange={e=>setQf({...qf,chapter_id:e.target.value})}><option value="">Tidak dipautkan</option>{chapters.map(c=><option key={c.id} value={c.id}>T{c.form_level} · Bab {c.chapter_number}: {c.title}</option>)}</select></label><button className={styles.primaryButton} disabled={busy||loading}>Cipta kuiz draf</button></form></section>
+ <label className={styles.fullWidth}>Bab silibus<select required value={qf.syllabus_chapter_id} onChange={e=>setQf({...qf,syllabus_chapter_id:e.target.value})}><option value="">Pilih bab silibus</option>{syllabusChapters.map(chapter=><option key={chapter.id} value={chapter.id}>Bab {chapter.chapter_number}: {chapter.title}</option>)}</select></label><button className={styles.primaryButton} disabled={busy||loading}>Cipta kuiz draf</button></form></section>
  <section className={styles.panel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>SENARAI KUIZ</span><h2>Kuiz berdaftar</h2></div><button className={styles.textButton} type="button" onClick={()=>void refresh()}>Muat semula</button></div>{loading?<p className={styles.emptyText}>Memuatkan...</p>:quizzes.length===0?<p className={styles.emptyText}>Belum ada kuiz.</p>:<div className={styles.quizList}>{quizzes.map(q=><button key={q.id} type="button" className={q.id===quizId?styles.quizListItemActive:styles.quizListItem} onClick={()=>setQuizId(q.id)}><span><strong>{q.title}</strong><small>{q.target_form_level?"Tingkatan "+q.target_form_level:"Tingkatan 4 dan 5"} · {q.attempt_limit} percubaan</small></span><span className={q.status==="published"?styles.publishedTag:styles.draftTag}>{q.status==="published"?"DITERBITKAN":"DRAF"}</span></button>)}</div>}</section></div>
- {selected?<><section className={styles.panel+" "+styles.questionPanel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>LANGKAH 2</span><h2>{selected.title}</h2><p className={styles.panelSub}>{selected.target_form_level?"Tingkatan "+selected.target_form_level:"Tingkatan 4 dan 5"}{selected.chapter_id&&chapterMap.get(selected.chapter_id)?" · Bab "+chapterMap.get(selected.chapter_id)?.chapter_number+": "+chapterMap.get(selected.chapter_id)?.title:""}</p></div><div className={styles.quizAdminActions}>
+ {selected?<><section className={styles.panel+" "+styles.questionPanel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>LANGKAH 2</span><h2>{selected.title}</h2><p className={styles.panelSub}>Bab {syllabusChapters.find(chapter=>chapter.id===selected.syllabus_chapter_id)?.chapter_number}: {syllabusChapters.find(chapter=>chapter.id===selected.syllabus_chapter_id)?.title} · {selected.target_form_level?"Tingkatan "+selected.target_form_level:"Tingkatan 4 dan 5"}{selected.chapter_id&&chapterMap.get(selected.chapter_id)?" · Bab "+chapterMap.get(selected.chapter_id)?.chapter_number+": "+chapterMap.get(selected.chapter_id)?.title:""}</p></div><div className={styles.quizAdminActions}>
  {selected.status==="published"
   ? <button className={styles.secondaryButton} type="button" disabled={busy} onClick={()=>void unpublish()}>Tarik balik</button>
   : <button className={styles.primaryButton} type="button" disabled={busy||!questions.length} onClick={()=>void publish()}>Terbitkan kuiz</button>}
@@ -336,13 +383,18 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   : null}
  <button className={styles.deleteButton} type="button" disabled={busy} onClick={()=>void removeQuiz()}>Padam kuiz</button>
 </div></div>
- <div className={styles.questionLayout}><div><h3>Soalan ({questions.length})</h3>{questions.length===0?<p className={styles.emptyText}>Tambahkan soalan untuk membina kuiz.</p>:questions.map(q=><article className={styles.questionCard} key={q.id}><div className={styles.questionMeta}><span>SOALAN {q.question_order}</span><span>{q.question_type==="objective"?"OBJEKTIF":"STRUKTUR"}</span><span>{q.marks} markah</span></div>{q.image_url?<img className={styles.questionImagePreview} src={q.image_url} alt={"Gambar soalan "+q.question_order}/>:null}{q.prompt!=="Lihat gambar soalan"?<p>{q.prompt}</p>:null}{q.question_type==="objective"?<ol className={styles.optionList} type="A">{options.filter(o=>o.question_id===q.id).map(o=><li key={o.id}>{o.option_text}</li>)}</ol>:<small>Jawapan struktur — ditanda secara manual.</small>}
+ <div className={styles.questionLayout}><div><h3>Soalan ({questions.length})</h3>{questions.length===0?<p className={styles.emptyText}>Tambahkan soalan untuk membina kuiz.</p>:questions.map(q=><article className={styles.questionCard} key={q.id}><div className={styles.questionMeta}><span>SOALAN {q.question_order}</span><span>{q.question_type==="objective"?"OBJEKTIF":"STRUKTUR"}</span><span>{q.marks} markah</span></div><div className={styles.questionSyllabusTag}>{syllabusTopics.find(topic=>topic.id===q.syllabus_topic_id)?.topic_code} · {syllabusTopics.find(topic=>topic.id===q.syllabus_topic_id)?.title??"Subbab tidak ditemui"}</div>{q.image_url?<img className={styles.questionImagePreview} src={q.image_url} alt={"Gambar soalan "+q.question_order}/>:null}{q.prompt!=="Lihat gambar soalan"?<p>{q.prompt}</p>:null}{q.question_type==="objective"?<ol className={styles.optionList} type="A">{options.filter(o=>o.question_id===q.id).map(o=><li key={o.id}>{o.option_text}</li>)}</ol>:<small>Jawapan struktur — ditanda secara manual.</small>}
  <div className={styles.questionCardActions}>
   <span>{selected.status==="published"?"Tarik balik kuiz untuk mengubah soalan.":attempts.length>0?"Reset percubaan sebelum memadam soalan.":"Soalan boleh dipadam."}</span>
   <button className={styles.questionDeleteButton} type="button" disabled={busy||selected.status==="published"} onClick={()=>void removeQuestion(q)}>Padam soalan</button>
  </div>
 </article>)}</div>
- <div className={styles.addQuestionBox}><h3>Tambah soalan</h3><form className={styles.form} onSubmit={addQuestion}><label>Jenis<select value={form.kind} onChange={e=>setForm({...form,kind:e.target.value as "objective"|"structured"})}><option value="objective">Objektif automatik</option><option value="structured">Struktur manual</option></select></label><label>Markah<input type="number" min="0.5" step="0.5" value={form.marks} onChange={e=>setForm({...form,marks:e.target.value})}/></label><label className={styles.fullWidth}>Pernyataan / arahan soalan (pilihan jika menggunakan gambar)<textarea rows={3} required={!form.imageFile} value={form.prompt} onChange={e=>setForm({...form,prompt:e.target.value})} placeholder="Taip soalan di sini, atau muat naik gambar soalan di bawah..."/></label>
+ <div className={styles.addQuestionBox}><h3>Tambah soalan</h3><form className={styles.form} onSubmit={addQuestion}><label>Jenis<select value={form.kind} onChange={e=>setForm({...form,kind:e.target.value as "objective"|"structured"})}><option value="objective">Objektif automatik</option><option value="structured">Struktur manual</option></select></label><label>Markah<input type="number" min="0.5" step="0.5" value={form.marks} onChange={e=>setForm({...form,marks:e.target.value})}/></label>
+ <label className={styles.fullWidth}>Bab kecil / subbab silibus<select required value={form.syllabusTopicId} onChange={e=>setForm({...form,syllabusTopicId:e.target.value})}>
+  <option value="">Pilih subbab bagi soalan ini</option>
+  {syllabusTopics.filter(topic=>topic.chapter_id===selected?.syllabus_chapter_id).map(topic=><option key={topic.id} value={topic.id}>{topic.topic_code} · {topic.title}</option>)}
+ </select></label>
+ <label className={styles.fullWidth}>Pernyataan / arahan soalan (pilihan jika menggunakan gambar)<textarea rows={3} required={!form.imageFile} value={form.prompt} onChange={e=>setForm({...form,prompt:e.target.value})} placeholder="Taip soalan di sini, atau muat naik gambar soalan di bawah..."/></label>
  <div className={styles.questionImageUploader}>
   <div className={styles.questionImageUploadCopy}>
    <strong>Gambar soalan (pilihan)</strong>
