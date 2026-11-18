@@ -312,13 +312,184 @@ async function removeQuestionImageObjects(
   }
 }
 
+async function attachSyllabusDetails(
+  supabaseUrl: string,
+  secretKey: string,
+  questionRows: JsonRecord[]
+) {
+  if (!questionRows.length) return questionRows;
+  const topicIds = [...new Set(questionRows
+    .map((question) => String(question.syllabus_topic_id ?? ""))
+    .filter(Boolean))];
+  const topicRows = topicIds.length ? await getRows(supabaseUrl, secretKey, "syllabus_topics", {
+    select: "id,chapter_id,topic_code,title,display_order",
+    id: "in.(" + topicIds.join(",") + ")",
+    limit: "500"
+  }) : [];
+  const chapterIds = [...new Set(topicRows.map((topic) => String(topic.chapter_id)))];
+  const chapterRows = chapterIds.length ? await getRows(supabaseUrl, secretKey, "syllabus_chapters", {
+    select: "id,chapter_number,title,display_order",
+    id: "in.(" + chapterIds.join(",") + ")",
+    limit: "100"
+  }) : [];
+  const chapterMap = new Map(chapterRows.map((chapter) => [String(chapter.id), chapter]));
+  const topicMap = new Map(topicRows.map((topic) => {
+    const chapter = chapterMap.get(String(topic.chapter_id));
+    return [String(topic.id), {
+      ...topic,
+      chapter_number: chapter?.chapter_number ?? null,
+      chapter_title: chapter?.title ?? null
+    }];
+  }));
+  return questionRows.map((question) => ({
+    ...question,
+    syllabus_topic: topicMap.get(String(question.syllabus_topic_id ?? "")) ?? null
+  }));
+}
+
+async function calculateStudentTopicPerformance(
+  supabaseUrl: string,
+  secretKey: string,
+  callerId: string
+) {
+  const [allTopics, allChapters, gradedAttempts, pendingAttempts] = await Promise.all([
+    getRows(supabaseUrl, secretKey, "syllabus_topics", {
+      select: "id,chapter_id,topic_code,title,display_order,is_active",
+      is_active: "eq.true",
+      order: "display_order.asc",
+      limit: "100"
+    }),
+    getRows(supabaseUrl, secretKey, "syllabus_chapters", {
+      select: "id,chapter_number,title,display_order",
+      is_active: "eq.true",
+      order: "display_order.asc",
+      limit: "20"
+    }),
+    getRows(supabaseUrl, secretKey, "quiz_attempts", {
+      select: "id,quiz_id,total_score,max_score,graded_at,submitted_at",
+      student_id: "eq." + callerId,
+      status: "eq.graded",
+      order: "graded_at.desc",
+      limit: "3000"
+    }),
+    getRows(supabaseUrl, secretKey, "quiz_attempts", {
+      select: "id",
+      student_id: "eq." + callerId,
+      status: "eq.pending_review",
+      limit: "3000"
+    })
+  ]);
+
+  const bestByQuiz = new Map<string, JsonRecord>();
+  for (const attempt of gradedAttempts) {
+    const quizId = String(attempt.quiz_id);
+    const current = bestByQuiz.get(quizId);
+    const maximum = asNumber(attempt.max_score);
+    const score = asNumber(attempt.total_score);
+    const ratio = maximum > 0 ? score / maximum : -1;
+    const currentMaximum = current ? asNumber(current.max_score) : 0;
+    const currentRatio = current && currentMaximum > 0
+      ? asNumber(current.total_score) / currentMaximum
+      : -1;
+    if (!current || ratio > currentRatio) bestByQuiz.set(quizId, attempt);
+  }
+
+  const selectedAttempts = [...bestByQuiz.values()];
+  const selectedAttemptIds = selectedAttempts.map((attempt) => String(attempt.id));
+  const responseRows = selectedAttemptIds.length ? await getRows(supabaseUrl, secretKey, "quiz_responses", {
+    select: "id,attempt_id,question_id,auto_score,teacher_score",
+    attempt_id: "in.(" + selectedAttemptIds.join(",") + ")",
+    limit: "10000"
+  }) : [];
+  const questionIds = [...new Set(responseRows.map((row) => String(row.question_id)))];
+  const questionRows = questionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_questions", {
+    select: "id,marks,syllabus_topic_id",
+    id: "in.(" + questionIds.join(",") + ")",
+    limit: "5000"
+  }) : [];
+  const questionMap = new Map(questionRows.map((question) => [String(question.id), question]));
+  const chapterMap = new Map(allChapters.map((chapter) => [String(chapter.id), chapter]));
+
+  const totals = new Map<string, {
+    earned: number;
+    maximum: number;
+    questionCount: number;
+    quizIds: Set<string>;
+  }>();
+  for (const response of responseRows) {
+    const question = questionMap.get(String(response.question_id));
+    const topicId = String(question?.syllabus_topic_id ?? "");
+    if (!topicId) continue;
+    const rawScore = response.auto_score !== null && response.auto_score !== undefined
+      ? response.auto_score
+      : response.teacher_score;
+    if (rawScore === null || rawScore === undefined) continue;
+    const current = totals.get(topicId) ?? {
+      earned: 0,
+      maximum: 0,
+      questionCount: 0,
+      quizIds: new Set<string>()
+    };
+    current.earned += asNumber(rawScore);
+    current.maximum += asNumber(question?.marks);
+    current.questionCount += 1;
+    const attempt = selectedAttempts.find((item) => String(item.id) === String(response.attempt_id));
+    if (attempt) current.quizIds.add(String(attempt.quiz_id));
+    totals.set(topicId, current);
+  }
+
+  const topics = allTopics.map((topic) => {
+    const chapter = chapterMap.get(String(topic.chapter_id));
+    const total = totals.get(String(topic.id));
+    const earned = total?.earned ?? 0;
+    const maximum = total?.maximum ?? 0;
+    return {
+      topic_id: topic.id,
+      topic_code: topic.topic_code,
+      topic_title: topic.title,
+      chapter_id: topic.chapter_id,
+      chapter_number: chapter?.chapter_number ?? null,
+      chapter_title: chapter?.title ?? null,
+      earned,
+      maximum,
+      percentage: maximum > 0 ? Math.round((earned / maximum) * 1000) / 10 : null,
+      question_count: total?.questionCount ?? 0,
+      quiz_count: total?.quizIds.size ?? 0,
+      assessed: maximum > 0
+    };
+  });
+
+  const assessedTopics = topics.filter((topic) => topic.assessed);
+  const totalEarned = assessedTopics.reduce((sum, topic) => sum + topic.earned, 0);
+  const totalMaximum = assessedTopics.reduce((sum, topic) => sum + topic.maximum, 0);
+  const lastUpdated = selectedAttempts.reduce((latest: string | null, attempt) => {
+    const stamp = typeof attempt.graded_at === "string" ? attempt.graded_at : null;
+    return stamp && (!latest || stamp > latest) ? stamp : latest;
+  }, null);
+
+  return {
+    chapters: allChapters,
+    topics,
+    summary: {
+      assessed_topics: assessedTopics.length,
+      total_topics: topics.length,
+      earned: totalEarned,
+      maximum: totalMaximum,
+      percentage: totalMaximum > 0 ? Math.round((totalEarned / totalMaximum) * 1000) / 10 : null,
+      best_quizzes: selectedAttempts.length,
+      pending_review_attempts: pendingAttempts.length,
+      last_updated: lastUpdated
+    }
+  };
+}
+
 async function getQuestionsAndOptions(
   supabaseUrl: string,
   secretKey: string,
   quizId: string
 ) {
   const questions = await getRows(supabaseUrl, secretKey, "quiz_questions", {
-    select: "id,quiz_id,question_order,question_type,prompt,marks,image_path",
+    select: "id,quiz_id,question_order,question_type,prompt,marks,image_path,syllabus_topic_id",
     quiz_id: "eq." + quizId,
     order: "question_order.asc",
     limit: "200"
@@ -331,7 +502,8 @@ async function getQuestionsAndOptions(
     order: "option_order.asc",
     limit: "1200"
   });
-  return { questions, options };
+  const questionsWithSyllabus = await attachSyllabusDetails(supabaseUrl, secretKey, questions);
+  return { questions: questionsWithSyllabus, options };
 }
 
 async function getManageableQuiz(
@@ -1189,7 +1361,12 @@ Deno.serve(async (req: Request) => {
     const action = typeof body.action === "string" ? body.action : "";
     let result: JsonRecord;
 
-    if (action === "student_score_history") {
+    if (action === "student_topic_performance") {
+      if (profile.role !== "student" || profile.is_active !== true) {
+        return send({ error: "Akses ditolak. Akaun murid aktif diperlukan." }, 403, origin);
+      }
+      result = await calculateStudentTopicPerformance(supabaseUrl, secretKey, callerId);
+    } else if (action === "student_score_history") {
       if (profile.role !== "student") return send({ error: "Tindakan ini khusus untuk murid." }, 403, origin);
       const historyAttempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
         select: "id,quiz_id,attempt_number,status,total_score,max_score,objective_score,submitted_at,started_at,graded_at",
@@ -1211,11 +1388,12 @@ Deno.serve(async (req: Request) => {
       }) : [];
       const historyQuestionIds = [...new Set(historyResponses.map((row) => String(row.question_id)))];
       const historyQuestions = historyQuestionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_questions", {
-        select: "id,question_order,question_type,prompt,marks,image_path",
+        select: "id,question_order,question_type,prompt,marks,image_path,syllabus_topic_id",
         id: "in.(" + historyQuestionIds.join(",") + ")",
         limit: "1000"
       }) : [];
-      const historyQuestionMap = new Map(historyQuestions.map((question) => [String(question.id), question]));
+      const historyQuestionsWithSyllabus = await attachSyllabusDetails(supabaseUrl, secretKey, historyQuestions);
+      const historyQuestionMap = new Map(historyQuestionsWithSyllabus.map((question) => [String(question.id), question]));
       result = {
         attempts: historyAttempts.map((attempt) => ({
           ...attempt,
@@ -1333,7 +1511,7 @@ Deno.serve(async (req: Request) => {
       }) : [];
       const questionIds = [...new Set(responseRows.map((r) => String(r.question_id)))];
       const questionRows = questionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_questions", {
-        select: "id,question_type,prompt,marks,question_order,image_path",
+        select: "id,question_type,prompt,marks,question_order,image_path,syllabus_topic_id",
         id: "in.(" + questionIds.join(",") + ")",
         limit: "1000"
       }) : [];
