@@ -69,6 +69,9 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   setLoading(false);
  },[s]);
  useEffect(()=>{void refresh();},[refresh]);
+ useEffect(()=>{
+  setForm(current=>({...current,syllabusTopicId:""}));
+ },[quizId]);
  useEffect(()=>()=>{if(form.imagePreviewUrl)URL.revokeObjectURL(form.imagePreviewUrl);},[form.imagePreviewUrl]);
  const detail=useCallback(async()=>{
   if(!quizId){setQuestions([]);setOptions([]);setAttempts([]);setRoster([]);return;}
@@ -149,6 +152,43 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  const pendingReviews=attempts.filter(a=>a.status==="pending_review").length;
  const bestCollected=studentSummaries.reduce((sum,x)=>sum+Number(x.best?.total_score??0),0);
  const bestMaximum=studentSummaries.reduce((sum,x)=>sum+Number(x.best?.max_score??0),0);
+ const topicSummaries=useMemo(()=>{
+  const bestByStudent=new Map<string,A>();
+  attempts.filter(attempt=>attempt.status==="graded").forEach(attempt=>{
+   const current=bestByStudent.get(attempt.student_id);
+   const currentRate=current&&current.max_score>0?current.total_score/current.max_score:-1;
+   const candidateRate=attempt.max_score>0?attempt.total_score/attempt.max_score:-1;
+   if(!current||candidateRate>currentRate)bestByStudent.set(attempt.student_id,attempt);
+  });
+  const totals=new Map<string,{earned:number;maximum:number;studentIds:Set<string>;questions:number}>();
+  bestByStudent.forEach(attempt=>{
+   attempt.responses.forEach(response=>{
+    const topicId=response.question?.syllabus_topic_id;
+    const rawScore=response.auto_score!==null&&response.auto_score!==undefined
+      ? response.auto_score
+      : response.teacher_score;
+    if(!topicId||rawScore===null||rawScore===undefined)return;
+    const total=totals.get(topicId)??{earned:0,maximum:0,studentIds:new Set<string>(),questions:0};
+    total.earned+=Number(rawScore);
+    total.maximum+=Number(response.question?.marks??0);
+    total.studentIds.add(attempt.student_id);
+    total.questions+=1;
+    totals.set(topicId,total);
+   });
+  });
+  return syllabusTopics.map(topic=>{
+   const total=totals.get(topic.id);
+   const maximum=total?.maximum??0;
+   const earned=total?.earned??0;
+   return {
+    ...topic,
+    earned,maximum,
+    percentage:maximum>0?Math.round((earned/maximum)*1000)/10:null,
+    students:total?.studentIds.size??0,
+    questions:total?.questions??0
+   };
+  }).filter(topic=>topic.maximum>0);
+ },[attempts,syllabusTopics]);
  const quizStatusLabel=(status:string)=>status==="graded"?"SELESAI DINILAI":status==="pending_review"?"MENUNGGU SEMAKAN":"SEDANG MENJAWAB";
  async function createQuiz(e:FormEvent){
   e.preventDefault();
@@ -417,6 +457,22 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   <div><strong>{studentsGraded}</strong><span>ADA MARKAH AKHIR</span></div>
   <div><strong>{pendingReviews}</strong><span>MENUNGGU SEMAKAN</span></div>
   <div><strong>{bestCollected}/{bestMaximum}</strong><span>KUTIPAN MARKAH TERBAIK</span></div>
+ </div>
+ <div className={styles.classTopicSummary}>
+  <div className={styles.classTopicSummaryHeading}>
+   <div><strong>Analisis pencapaian mengikut subbab</strong><span>Markah terbaik bagi setiap murid dalam kuiz ini</span></div>
+   <span>{topicSummaries.length} SUBBAB</span>
+  </div>
+  {topicSummaries.length===0?<p className={styles.classTopicSummaryEmpty}>Belum ada percubaan yang selesai dinilai untuk mengira pencapaian subbab.</p>:(
+   <div className={styles.classTopicSummaryGrid}>
+    {topicSummaries.map(topic=><article className={styles.classTopicSummaryCard} key={topic.id}>
+     <div><span>{topic.topic_code}</span><strong>{topic.title}</strong></div>
+     <b>{topic.earned}/{topic.maximum} · {topic.percentage}%</b>
+     <div className={styles.classTopicSummaryTrack}><span style={{width:Math.max(0,Math.min(100,topic.percentage??0))+"%"}}/></div>
+     <small>{topic.students} murid · {topic.questions} respons dinilai</small>
+    </article>)}
+   </div>
+  )}
  </div>
  <div className={styles.markCollectionTableWrap}><table className={styles.markCollectionTable}>
   <thead><tr><th>NAMA MURID</th><th>KELAS</th><th>PERCUBAAN</th><th>MARKAH TERBAIK</th><th>STATUS TERKINI</th><th></th></tr></thead>
