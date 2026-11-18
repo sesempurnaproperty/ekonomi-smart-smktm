@@ -143,3 +143,22 @@ Semua tindakan simpan tanda diperiksa di Edge Function; guru hanya boleh menanda
 - Pautan imej dijana oleh Edge Function sebagai signed URL untuk tempoh terhad. Fungsi ini mengesahkan guru pemilik/penugasan kelas, kelayakan tingkatan murid atau rekod percubaan terdahulu sebelum memulangkan pautan.
 - Gambar dipaparkan dalam pembina kuiz, ruang menjawab murid, sejarah skrip murid dan semakan guru.
 - Apabila soalan atau keseluruhan kuiz dipadam, Edge Function turut memadam fail imej berkaitannya melalui Storage API.
+
+
+## Silibus rasmi dan prestasi mengikut bab EKONOMI SMART SMKTM
+
+Katalog silibus mengandungi enam bab dan enam belas subbab:
+1. Pengenalan kepada Ekonomi — 1.1 Konsep kekurangan, pilihan dan kos lepas; 1.2 Sistem ekonomi dan penyelesaian masalah asas ekonomi.
+2. Pasaran — 2.1 Keseimbangan Pasaran; 2.2 Keanjalan harga.
+3. Pendapatan Individu — 3.1 Wang dan Bank; 3.2 Pendapatan Individu; 3.3 Penggunaan pendapatan individu.
+4. Pengeluaran — 4.1 Konsep pengeluaran, kos dan hasil; 4.2 Produktiviti dan Eksternaliti.
+5. Ekonomi dan Kerajaan — 5.1 Peranan Kerajaan; 5.2 Penunjuk Ekonomi; 5.3 Alat Dasar Ekonomi.
+6. Malaysia dan Ekonomi Global — 6.1 Globalisasi; 6.2 Perdagangan Antarabangsa; 6.3 Imbangan Pembayaran; 6.4 Kadar Pertukaran Asing.
+
+- Setiap kuiz baharu mesti dipautkan kepada satu bab silibus.
+- Setiap soalan baharu mesti dipautkan kepada satu subbab di bawah bab kuiz tersebut. Trigger pangkalan data menolak padanan bab/subbab yang tidak konsisten.
+- Setiap respons objektif dan struktur mewarisi subbab soalan untuk analisis prestasi.
+- Dashboard murid mengumpulkan markah mengikut subbab daripada percubaan terbaik yang telah selesai dinilai bagi setiap kuiz. Percubaan menunggu semakan tidak dimasukkan dalam kutipan akhir; percubaan berulang tidak menggandakan jumlah.
+- Subbab tanpa aktiviti yang selesai dinilai dipaparkan sebagai **Belum diuji**, bukannya markah sifar.
+- Katalog silibus ini berdiri berasingan daripada katalog bab bahan pembelajaran lama supaya pautan nota sedia ada tidak berubah.
+- Pemetaan khusus bab kepada Tingkatan 4 atau Tingkatan 5 belum ditetapkan dalam katalog ini; senarai enam bab digunakan seperti yang diberikan sehingga pembahagian tingkatan ditentukan.
