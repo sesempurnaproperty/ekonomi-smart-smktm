@@ -808,3 +808,23 @@ mark.studentMarkRepeat { background:#e8e4fb; color:#55448d; text-decoration:unde
     padding:3px;
   }
 }
+
+
+.questionSyllabusTag,.studentQuestionSyllabusTag {
+  display:inline-flex;
+  align-items:center;
+  max-width:100%;
+  margin:4px 0 9px;
+  padding:5px 8px;
+  border:1px solid #dcebe0;
+  border-radius:6px;
+  background:#f1f8f2;
+  color:#246b4f;
+  font-size:8px;
+  font-weight:850;
+  line-height:1.45;
+}
+.studentQuestionSyllabusTag {
+  margin:0 0 10px;
+  font-size:9px;
+}
