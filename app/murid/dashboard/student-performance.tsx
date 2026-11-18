@@ -12,10 +12,39 @@ type AssessmentMark = {
 };
 type Assessment = { code: string; title: string; max_score: number; is_active: boolean };
 type StudentIdentity = { user_id: string; full_name: string; form_level: number | null; class_name: string | null };
+type TopicPerformance = {
+  topic_id:string;
+  topic_code:string;
+  topic_title:string;
+  chapter_id:string;
+  chapter_number:number;
+  chapter_title:string;
+  earned:number;
+  maximum:number;
+  percentage:number|null;
+  question_count:number;
+  quiz_count:number;
+  assessed:boolean;
+};
+type SyllabusPerformance = {
+  chapters:{id:string;chapter_number:number;title:string;display_order:number}[];
+  topics:TopicPerformance[];
+  summary:{
+    assessed_topics:number;
+    total_topics:number;
+    earned:number;
+    maximum:number;
+    percentage:number|null;
+    best_quizzes:number;
+    pending_review_attempts:number;
+    last_updated:string|null;
+  };
+};
 type PerformanceResponse = {
   student?: StudentIdentity;
   marks?: AssessmentMark[];
   assessments?: Assessment[];
+  syllabus_performance?: SyllabusPerformance;
   last_updated?: string | null;
   error?: string;
 };
@@ -45,7 +74,14 @@ async function fetchMyPerformance(): Promise<PerformanceResponse> {
 
   const result = (await response.json()) as PerformanceResponse;
   if (!response.ok) throw new Error(result.error ?? "Rekod pencapaian anda gagal dimuatkan.");
-  return result;
+
+  const {data:syllabusData,error:syllabusError}=await supabase.functions.invoke("quiz-engine",{
+    body:{action:"student_topic_performance"}
+  });
+  if(syllabusError||syllabusData?.error){
+    throw new Error(syllabusError?.message??syllabusData?.error??"Analisis pencapaian mengikut bab gagal dimuatkan.");
+  }
+  return {...result,syllabus_performance:syllabusData as SyllabusPerformance};
 }
 
 function numberScore(mark?: AssessmentMark): number | null {
@@ -195,6 +231,7 @@ export default function StudentPerformance() {
   const [student, setStudent] = useState<StudentIdentity | null>(null);
   const [marks, setMarks] = useState<AssessmentMark[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [syllabusPerformance,setSyllabusPerformance]=useState<SyllabusPerformance|null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -207,6 +244,7 @@ export default function StudentPerformance() {
       setStudent(data.student ?? null);
       setMarks(data.marks ?? []);
       setAssessments((data.assessments ?? []).filter((item) => item.is_active));
+      setSyllabusPerformance(data.syllabus_performance??null);
       setLastUpdated(data.last_updated ?? null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Data pencapaian gagal dimuatkan.");
@@ -312,6 +350,59 @@ export default function StudentPerformance() {
             </div>
           ) : null}
 
+          <section className={styles.syllabusSection}>
+            <div className={styles.syllabusHeader}>
+              <div>
+                <span className={styles.sectionEyebrow}>ANALISIS MENGIKUT SILIBUS</span>
+                <h3>Penguasaan bab dan subbab</h3>
+                <p>Markah berdasarkan percubaan terbaik yang telah selesai dinilai bagi setiap kuiz. Rekod yang belum diuji atau masih menunggu semakan tidak dikira sebagai markah akhir.</p>
+              </div>
+              <div className={styles.syllabusOverall}>
+                <strong>{syllabusPerformance?.summary.percentage===null||syllabusPerformance?.summary.percentage===undefined?"—":syllabusPerformance.summary.percentage+"%"}</strong>
+                <span>PENCAPAIAN TERKUMPUL</span>
+              </div>
+            </div>
+            <div className={styles.syllabusStats}>
+              <div><strong>{syllabusPerformance?.summary.assessed_topics??0}/{syllabusPerformance?.summary.total_topics??16}</strong><span>SUBBAB DINILAI</span></div>
+              <div><strong>{syllabusPerformance?.summary.best_quizzes??0}</strong><span>KUIZ SELESAI DINILAI</span></div>
+              <div><strong>{syllabusPerformance?.summary.pending_review_attempts??0}</strong><span>MENUNGGU SEMAKAN</span></div>
+            </div>
+            <div className={styles.syllabusChapterGrid}>
+              {(syllabusPerformance?.chapters??[]).map(chapter=>{
+                const chapterTopics=(syllabusPerformance?.topics??[]).filter(topic=>topic.chapter_id===chapter.id);
+                const assessed=chapterTopics.filter(topic=>topic.assessed);
+                const earned=assessed.reduce((sum,topic)=>sum+topic.earned,0);
+                const maximum=assessed.reduce((sum,topic)=>sum+topic.maximum,0);
+                const chapterPercent=maximum>0?Math.round((earned/maximum)*1000)/10:null;
+                return (
+                  <article className={styles.syllabusChapterCard} key={chapter.id}>
+                    <div className={styles.syllabusChapterHeading}>
+                      <div><span>BAB {chapter.chapter_number}</span><h4>{chapter.title}</h4></div>
+                      <strong>{chapterPercent===null?"—":chapterPercent+"%"}</strong>
+                    </div>
+                    <div className={styles.syllabusTopicList}>
+                      {chapterTopics.map(topic=>(
+                        <div className={styles.syllabusTopicRow} key={topic.topic_id}>
+                          <div className={styles.syllabusTopicTop}>
+                            <span><b>{topic.topic_code}</b> · {topic.topic_title}</span>
+                            <strong>{topic.assessed?formatScore(topic.earned)+" / "+formatScore(topic.maximum):"Belum diuji"}</strong>
+                          </div>
+                          {topic.assessed?(
+                            <div className={styles.syllabusTopicTrack}>
+                              <span style={{width:Math.max(0,Math.min(100,topic.percentage??0))+"%"}}/>
+                            </div>
+                          ):(
+                            <div className={styles.syllabusTopicNotTested}>Belum ada kuiz atau latihan yang selesai dinilai untuk subbab ini.</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
           <div className={styles.progressCard}>
             <div>
               <span className={styles.sectionEyebrow}>PERKEMBANGAN DIRI</span>
@@ -357,7 +448,7 @@ export default function StudentPerformance() {
 
           <div className={styles.studentGuidance}>
             <strong>Bagaimana cadangan ini ditentukan?</strong>
-            <p>Sistem menggunakan markah individu, julat gred dan status pentaksiran. Sistem belum menerima analisis mengikut bab atau item soalan; oleh itu, cadangan ini memberi fokus kepada kemahiran dan tindakan umum, bukan mendakwa bab tertentu sebagai kelemahan anda.</p>
+            <p>Sistem menggunakan markah peperiksaan serta markah latihan/kuiz yang telah selesai dinilai. Analisis bab dan subbab memaparkan kutipan sebenar mengikut soalan yang dipautkan kepada silibus; subbab yang belum diuji kekal ditandakan belum diuji.</p>
           </div>
 
           <p className={styles.updatedNote}>Rekod peribadi dikemas kini terakhir: {updatedLabel}. Data yang dipaparkan adalah milik akaun anda sahaja.</p>
