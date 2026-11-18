@@ -100,3 +100,98 @@ alter table public.quiz_questions
 
 create index if not exists quiz_questions_syllabus_topic_idx
   on public.quiz_questions(syllabus_topic_id);
+
+
+-- Every quiz is anchored to one canonical syllabus chapter.
+alter table public.learning_quizzes
+  add column if not exists syllabus_chapter_id uuid
+  references public.syllabus_chapters(id) on delete restrict;
+
+-- Backfill legacy quizzes from their existing form-specific chapter association.
+update public.learning_quizzes q
+set syllabus_chapter_id=sc.id,updated_at=now()
+from public.learning_chapters old_chapter
+join public.syllabus_chapters sc on sc.chapter_number=old_chapter.chapter_number
+where q.chapter_id=old_chapter.id
+  and q.syllabus_chapter_id is null;
+
+do $$
+begin
+  if exists (
+    select 1 from public.learning_quizzes
+    where syllabus_chapter_id is null
+  ) then
+    raise exception 'Pautkan semua kuiz kepada bab silibus sebelum menguatkuasakan bab wajib.';
+  end if;
+end $$;
+
+alter table public.learning_quizzes
+  alter column syllabus_chapter_id set not null;
+
+create index if not exists learning_quizzes_syllabus_chapter_idx
+  on public.learning_quizzes(syllabus_chapter_id);
+
+-- Enforce that each question's subchapter belongs to the quiz's selected chapter.
+create or replace function public.enforce_quiz_question_syllabus_topic()
+returns trigger
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  v_quiz_chapter uuid;
+  v_topic_chapter uuid;
+begin
+  select syllabus_chapter_id into v_quiz_chapter
+  from public.learning_quizzes
+  where id=new.quiz_id;
+
+  select chapter_id into v_topic_chapter
+  from public.syllabus_topics
+  where id=new.syllabus_topic_id
+    and is_active=true;
+
+  if v_quiz_chapter is null or v_topic_chapter is null then
+    raise exception 'Bab kuiz dan subbab soalan mesti dipilih daripada katalog silibus aktif.';
+  end if;
+
+  if v_quiz_chapter <> v_topic_chapter then
+    raise exception 'Subbab soalan mesti berada di bawah bab silibus yang dipilih untuk kuiz ini.';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_enforce_quiz_question_syllabus_topic on public.quiz_questions;
+create trigger trg_enforce_quiz_question_syllabus_topic
+before insert or update of quiz_id,syllabus_topic_id
+on public.quiz_questions
+for each row execute function public.enforce_quiz_question_syllabus_topic();
+
+create or replace function public.prevent_quiz_syllabus_chapter_mismatch()
+returns trigger
+language plpgsql
+security definer
+set search_path=public
+as $$
+begin
+  if new.syllabus_chapter_id is distinct from old.syllabus_chapter_id
+    and exists (
+      select 1
+      from public.quiz_questions q
+      join public.syllabus_topics t on t.id=q.syllabus_topic_id
+      where q.quiz_id=new.id and t.chapter_id<>new.syllabus_chapter_id
+    )
+  then
+    raise exception 'Bab kuiz tidak boleh diubah selagi soalan berdaftar menggunakan subbab daripada bab lain.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_prevent_quiz_syllabus_chapter_mismatch on public.learning_quizzes;
+create trigger trg_prevent_quiz_syllabus_chapter_mismatch
+before update of syllabus_chapter_id
+on public.learning_quizzes
+for each row execute function public.prevent_quiz_syllabus_chapter_mismatch();
