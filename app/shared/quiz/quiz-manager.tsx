@@ -192,14 +192,13 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  const quizStatusLabel=(status:string)=>status==="graded"?"SELESAI DINILAI":status==="pending_review"?"MENUNGGU SEMAKAN":"SEDANG MENJAWAB";
  async function createQuiz(e:FormEvent){
   e.preventDefault();
-  if(!qf.syllabus_chapter_id){setError("Pilih bab silibus sebelum mencipta kuiz.");return;}
   setBusy(true);setError("");
   const {data,error:err}=await s.from("learning_quizzes").insert({
    title:qf.title.trim(),
    description:qf.description.trim()||null,
    target_form_level:qf.target==="all"?null:Number(qf.target),
    chapter_id:qf.chapter_id||null,
-   syllabus_chapter_id:qf.syllabus_chapter_id,
+   syllabus_chapter_id:qf.syllabus_chapter_id||null,
    attempt_limit:Number(qf.limit),
    created_by:uid,status:"draft"
   }).select("*").single();
@@ -412,9 +411,9 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  <label className={styles.fullWidth}>Tajuk kuiz<input required value={qf.title} onChange={e=>setQf({...qf,title:e.target.value})} placeholder="Contoh: Latihan Bab 1"/></label><label className={styles.fullWidth}>Penerangan<textarea rows={2} value={qf.description} onChange={e=>setQf({...qf,description:e.target.value})}/></label>
  <label>Sasaran<select value={qf.target} onChange={e=>setQf({...qf,target:e.target.value})}><option value="all">Tingkatan 4 dan 5</option><option value="4">Tingkatan 4</option><option value="5">Tingkatan 5</option></select></label>
  <label>Had percubaan<select value={qf.limit} onChange={e=>setQf({...qf,limit:e.target.value})}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n} kali</option>)}</select></label>
- <label className={styles.fullWidth}>Bab silibus<select required value={qf.syllabus_chapter_id} onChange={e=>setQf({...qf,syllabus_chapter_id:e.target.value})}><option value="">Pilih bab silibus</option>{syllabusChapters.map(chapter=><option key={chapter.id} value={chapter.id}>Bab {chapter.chapter_number}: {chapter.title}</option>)}</select></label><button className={styles.primaryButton} disabled={busy||loading}>Cipta kuiz draf</button></form></section>
+ <label className={styles.fullWidth}>Fokus bab kuiz<select value={qf.syllabus_chapter_id} onChange={e=>setQf({...qf,syllabus_chapter_id:e.target.value})}><option value="">Kuiz gabungan — pelbagai bab</option>{syllabusChapters.map(chapter=><option key={chapter.id} value={chapter.id}>Bab {chapter.chapter_number}: {chapter.title}</option>)}</select><small>Untuk kuiz gabungan, pilih subbab yang tepat bagi setiap soalan semasa menambah soalan.</small></label><button className={styles.primaryButton} disabled={busy||loading}>Cipta kuiz draf</button></form></section>
  <section className={styles.panel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>SENARAI KUIZ</span><h2>Kuiz berdaftar</h2></div><button className={styles.textButton} type="button" onClick={()=>void refresh()}>Muat semula</button></div>{loading?<p className={styles.emptyText}>Memuatkan...</p>:quizzes.length===0?<p className={styles.emptyText}>Belum ada kuiz.</p>:<div className={styles.quizList}>{quizzes.map(q=><button key={q.id} type="button" className={q.id===quizId?styles.quizListItemActive:styles.quizListItem} onClick={()=>setQuizId(q.id)}><span><strong>{q.title}</strong><small>{q.target_form_level?"Tingkatan "+q.target_form_level:"Tingkatan 4 dan 5"} · {q.attempt_limit} percubaan</small></span><span className={q.status==="published"?styles.publishedTag:styles.draftTag}>{q.status==="published"?"DITERBITKAN":"DRAF"}</span></button>)}</div>}</section></div>
- {selected?<><section className={styles.panel+" "+styles.questionPanel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>LANGKAH 2</span><h2>{selected.title}</h2><p className={styles.panelSub}>Bab {syllabusChapters.find(chapter=>chapter.id===selected.syllabus_chapter_id)?.chapter_number}: {syllabusChapters.find(chapter=>chapter.id===selected.syllabus_chapter_id)?.title} · {selected.target_form_level?"Tingkatan "+selected.target_form_level:"Tingkatan 4 dan 5"}{selected.chapter_id&&chapterMap.get(selected.chapter_id)?" · Bab "+chapterMap.get(selected.chapter_id)?.chapter_number+": "+chapterMap.get(selected.chapter_id)?.title:""}</p></div><div className={styles.quizAdminActions}>
+ {selected?<><section className={styles.panel+" "+styles.questionPanel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>LANGKAH 2</span><h2>{selected.title}</h2><p className={styles.panelSub}>{selected.syllabus_chapter_id?("Bab "+syllabusChapters.find(chapter=>chapter.id===selected.syllabus_chapter_id)?.chapter_number+": "+syllabusChapters.find(chapter=>chapter.id===selected.syllabus_chapter_id)?.title):"Kuiz gabungan pelbagai bab"} · {selected.target_form_level?"Tingkatan "+selected.target_form_level:"Tingkatan 4 dan 5"}{selected.chapter_id&&chapterMap.get(selected.chapter_id)?" · Bab "+chapterMap.get(selected.chapter_id)?.chapter_number+": "+chapterMap.get(selected.chapter_id)?.title:""}</p></div><div className={styles.quizAdminActions}>
  {selected.status==="published"
   ? <button className={styles.secondaryButton} type="button" disabled={busy} onClick={()=>void unpublish()}>Tarik balik</button>
   : <button className={styles.primaryButton} type="button" disabled={busy||!questions.length} onClick={()=>void publish()}>Terbitkan kuiz</button>}
@@ -432,7 +431,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  <div className={styles.addQuestionBox}><h3>Tambah soalan</h3><form className={styles.form} onSubmit={addQuestion}><label>Jenis<select value={form.kind} onChange={e=>setForm({...form,kind:e.target.value as "objective"|"structured"})}><option value="objective">Objektif automatik</option><option value="structured">Struktur manual</option></select></label><label>Markah<input type="number" min="0.5" step="0.5" value={form.marks} onChange={e=>setForm({...form,marks:e.target.value})}/></label>
  <label className={styles.fullWidth}>Bab kecil / subbab silibus<select required value={form.syllabusTopicId} onChange={e=>setForm({...form,syllabusTopicId:e.target.value})}>
   <option value="">Pilih subbab bagi soalan ini</option>
-  {syllabusTopics.filter(topic=>topic.chapter_id===selected?.syllabus_chapter_id).map(topic=><option key={topic.id} value={topic.id}>{topic.topic_code} · {topic.title}</option>)}
+  {syllabusTopics.filter(topic=>!selected?.syllabus_chapter_id||topic.chapter_id===selected.syllabus_chapter_id).map(topic=><option key={topic.id} value={topic.id}>{topic.topic_code} · {topic.title}</option>)}
  </select></label>
  <label className={styles.fullWidth}>Pernyataan / arahan soalan (pilihan jika menggunakan gambar)<textarea rows={3} required={!form.imageFile} value={form.prompt} onChange={e=>setForm({...form,prompt:e.target.value})} placeholder="Taip soalan di sini, atau muat naik gambar soalan di bawah..."/></label>
  <div className={styles.questionImageUploader}>
