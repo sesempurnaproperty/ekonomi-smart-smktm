@@ -195,3 +195,59 @@ create trigger trg_prevent_quiz_syllabus_chapter_mismatch
 before update of syllabus_chapter_id
 on public.learning_quizzes
 for each row execute function public.prevent_quiz_syllabus_chapter_mismatch();
+
+
+-- A quiz may be focused on one chapter or be a mixed-chapter assessment.
+alter table public.learning_quizzes
+  alter column syllabus_chapter_id drop not null;
+
+create or replace function public.enforce_quiz_question_syllabus_topic()
+returns trigger
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  v_quiz_chapter uuid;
+  v_topic_chapter uuid;
+begin
+  select syllabus_chapter_id into v_quiz_chapter
+  from public.learning_quizzes where id=new.quiz_id;
+
+  select chapter_id into v_topic_chapter
+  from public.syllabus_topics
+  where id=new.syllabus_topic_id and is_active=true;
+
+  if v_topic_chapter is null then
+    raise exception 'Pilih subbab aktif daripada katalog silibus.';
+  end if;
+
+  if v_quiz_chapter is not null and v_quiz_chapter <> v_topic_chapter then
+    raise exception 'Subbab soalan mesti berada di bawah bab silibus yang dipilih untuk kuiz ini.';
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace function public.prevent_quiz_syllabus_chapter_mismatch()
+returns trigger
+language plpgsql
+security definer
+set search_path=public
+as $$
+begin
+  if new.syllabus_chapter_id is not null
+    and new.syllabus_chapter_id is distinct from old.syllabus_chapter_id
+    and exists (
+      select 1
+      from public.quiz_questions q
+      join public.syllabus_topics t on t.id=q.syllabus_topic_id
+      where q.quiz_id=new.id and t.chapter_id<>new.syllabus_chapter_id
+    )
+  then
+    raise exception 'Bab kuiz tidak boleh diubah kerana terdapat soalan daripada bab lain. Gunakan mod kuiz gabungan atau selaraskan soalan terlebih dahulu.';
+  end if;
+  return new;
+end;
+$$;
