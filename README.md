@@ -162,3 +162,8 @@ Katalog silibus mengandungi enam bab dan enam belas subbab:
 - Subbab tanpa aktiviti yang selesai dinilai dipaparkan sebagai **Belum diuji**, bukannya markah sifar.
 - Katalog silibus ini berdiri berasingan daripada katalog bab bahan pembelajaran lama supaya pautan nota sedia ada tidak berubah.
 - Pemetaan khusus bab kepada Tingkatan 4 atau Tingkatan 5 belum ditetapkan dalam katalog ini; senarai enam bab digunakan seperti yang diberikan sehingga pembahagian tingkatan ditentukan.
+
+
+- Kuiz boleh difokuskan kepada satu Bab atau ditetapkan sebagai **Kuiz gabungan — pelbagai bab**. Dalam kedua-dua mod, setiap soalan tetap wajib memilih satu subbab daripada katalog 16 subbab.
+- Untuk kuiz fokus satu Bab, senarai subbab ditapis kepada Bab tersebut. Untuk kuiz gabungan, guru boleh memilih mana-mana subbab bagi setiap soalan.
+- Laporan guru/pentadbir bagi kuiz memaparkan ringkasan pencapaian kelas mengikut subbab; laporan individu murid memaparkan pencapaian terkumpul mengikut kesemua enam bab.
