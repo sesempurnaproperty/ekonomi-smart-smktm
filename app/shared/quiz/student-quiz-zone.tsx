@@ -14,6 +14,9 @@ type Quiz = {
 };
 type MarkType = "right" | "wrong" | "tr" | "repeat";
 type MarkAnnotation = { id:string; start:number; end:number; text:string; type:MarkType; comment?:string };
+type SyllabusTopicInfo={
+  id:string;topic_code:string;title:string;chapter_number:number;chapter_title:string;
+};
 type ScoredResponse = {
   id:string;
   response_text:string|null;
@@ -21,7 +24,7 @@ type ScoredResponse = {
   teacher_score:number|null;
   feedback:string|null;
   marking_annotations:MarkAnnotation[]|null;
-  question:{question_order:number;question_type:"objective"|"structured";prompt:string;marks:number;image_path:string|null;image_url?:string|null}|null;
+  question:{question_order:number;question_type:"objective"|"structured";prompt:string;marks:number;image_path:string|null;image_url?:string|null;syllabus_topic_id:string;syllabus_topic?:SyllabusTopicInfo|null}|null;
 };
 type Attempt = {
   id: string;
@@ -43,6 +46,8 @@ type Question = {
   marks: number;
   image_path: string | null;
   image_url?: string | null;
+  syllabus_topic_id:string;
+  syllabus_topic?:SyllabusTopicInfo|null;
   options: Option[];
 };
 type Active = {
@@ -444,6 +449,7 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
                                         <span>SOALAN {response.question?.question_order??index+1}</span>
                                         <span>{displayMark(response.teacher_score??0)} / {displayMark(response.question?.marks??0)} MARKAH STRUKTUR</span>
                                       </div>
+                                      {response.question?.syllabus_topic?<div className={styles.studentQuestionSyllabusTag}>BAB {response.question.syllabus_topic.chapter_number} · {response.question.syllabus_topic.topic_code} · {response.question.syllabus_topic.title}</div>:null}
                                       {response.question?.image_url?<img className={styles.studentQuestionImage} src={response.question.image_url} alt={"Gambar soalan "+(response.question.question_order??index+1)}/>:null}
                                       {response.question?.prompt!=="Lihat gambar soalan"?<strong className={styles.studentMarkedQuestion}>{response.question?.prompt}</strong>:null}
                                       <div className={styles.studentMarkedAnswer}>{response.response_text?renderStudentMarkedAnswer(response.response_text,response.marking_annotations):"Tiada jawapan bertulis."}</div>
@@ -498,6 +504,7 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
                   <span>{question.marks} MARKAH</span>
                   <span>{question.question_type === "objective" ? "OBJEKTIF" : "STRUKTUR"}</span>
                 </div>
+                {question.syllabus_topic?<div className={styles.studentQuestionSyllabusTag}>BAB {question.syllabus_topic.chapter_number} · {question.syllabus_topic.topic_code} · {question.syllabus_topic.title}</div>:null}
                 {question.image_url?<img className={styles.studentQuestionImage} src={question.image_url} alt={"Gambar soalan "+question.question_order}/>:null}
                 {question.prompt!=="Lihat gambar soalan"?<h3>{question.prompt}</h3>:null}
                 {question.question_type === "objective" ? (
