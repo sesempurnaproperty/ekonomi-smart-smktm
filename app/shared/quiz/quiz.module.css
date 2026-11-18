@@ -828,3 +828,98 @@ mark.studentMarkRepeat { background:#e8e4fb; color:#55448d; text-decoration:unde
   margin:0 0 10px;
   font-size:9px;
 }
+
+
+.classTopicSummary {
+  display:grid;
+  gap:11px;
+  margin:12px 0 15px;
+  padding:13px;
+  border:1px solid #e2ebe4;
+  border-radius:9px;
+  background:#fff;
+}
+.classTopicSummaryHeading {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+}
+.classTopicSummaryHeading > div {
+  display:grid;
+  gap:4px;
+}
+.classTopicSummaryHeading strong {
+  color:#244b39;
+  font-size:10px;
+}
+.classTopicSummaryHeading span {
+  color:#829188;
+  font-size:8px;
+}
+.classTopicSummaryHeading > span {
+  color:#197454;
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:.08em;
+}
+.classTopicSummaryGrid {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+.classTopicSummaryCard {
+  display:grid;
+  gap:7px;
+  min-width:0;
+  padding:10px;
+  border:1px solid #e8eee9;
+  border-radius:7px;
+  background:#fafcfa;
+}
+.classTopicSummaryCard > div:first-child {
+  display:grid;
+  gap:3px;
+}
+.classTopicSummaryCard > div:first-child span {
+  color:#177c59;
+  font-size:8px;
+  font-weight:900;
+}
+.classTopicSummaryCard > div:first-child strong {
+  color:#486252;
+  font-size:8px;
+  line-height:1.45;
+}
+.classTopicSummaryCard > b {
+  color:#1a6f50;
+  font-size:11px;
+  font-weight:900;
+}
+.classTopicSummaryTrack {
+  height:5px;
+  overflow:hidden;
+  border-radius:50px;
+  background:#eaf0eb;
+}
+.classTopicSummaryTrack span {
+  display:block;
+  height:100%;
+  border-radius:50px;
+  background:linear-gradient(90deg,#168063,#83c8a1);
+}
+.classTopicSummaryCard small {
+  color:#8a9890;
+  font-size:7px;
+}
+.classTopicSummaryEmpty {
+  margin:0;
+  color:#87958c;
+  font-size:9px;
+  line-height:1.55;
+}
+@media(max-width:620px) {
+  .classTopicSummary { padding:10px; }
+  .classTopicSummaryGrid { grid-template-columns:1fr; }
+  .classTopicSummaryHeading { align-items:flex-start; }
+}
