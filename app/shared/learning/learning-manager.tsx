@@ -58,6 +58,9 @@ export default function LearningManager({ dashboardHref, roleLabel }: ManagerPro
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingPath, setEditingPath] = useState<string | null>(null);
+  const [previewMaterial, setPreviewMaterial] = useState<Material | null>(null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -262,6 +265,52 @@ export default function LearningManager({ dashboardHref, roleLabel }: ManagerPro
     await refresh();
   }
 
+  async function openMaterialPreview(material: Material) {
+    setError("");
+    setNotice("");
+
+    if (material.material_type === "video" || material.material_type === "link") {
+      if (!material.resource_url) {
+        setError("Pautan bahan tidak tersedia.");
+        return;
+      }
+      window.open(material.resource_url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    setPreviewMaterial(material);
+    setPreviewPdfUrl(null);
+    if (material.material_type === "note") return;
+
+    if (!material.storage_path) {
+      setPreviewMaterial(null);
+      setError("Fail PDF tidak mempunyai laluan storan yang sah.");
+      return;
+    }
+
+    setPreviewLoading(true);
+    try {
+      const { data, error: signedError } = await supabase.storage
+        .from("learning-materials")
+        .createSignedUrl(material.storage_path, 3600);
+      if (signedError || !data?.signedUrl) {
+        throw new Error(signedError?.message ?? "Pautan PDF gagal dijana.");
+      }
+      setPreviewPdfUrl(data.signedUrl);
+    } catch (cause) {
+      setPreviewMaterial(null);
+      setError(cause instanceof Error ? "PDF gagal dibuka: " + cause.message : "PDF gagal dibuka. Sila cuba lagi.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  function closeMaterialPreview() {
+    setPreviewMaterial(null);
+    setPreviewPdfUrl(null);
+    setPreviewLoading(false);
+  }
+
   return (
     <main className={styles.pageShell}>
       <header className={styles.topBar}>
@@ -402,6 +451,7 @@ export default function LearningManager({ dashboardHref, roleLabel }: ManagerPro
                       {material.description ? <small>{material.description}</small> : null}
                     </div>
                     <div className={styles.materialActions}>
+                      <button type="button" className={styles.smallButton} onClick={() => void openMaterialPreview(material)}>Semak</button>
                       <button type="button" className={styles.smallButton} onClick={() => startEdit(material)}>Edit</button>
                       <button type="button" className={styles.smallButton} onClick={() => void togglePublished(material)}>{material.is_published ? "Jadikan draf" : "Terbitkan"}</button>
                       <button type="button" className={styles.dangerButton} onClick={() => void deleteMaterial(material)}>Padam</button>
@@ -413,6 +463,37 @@ export default function LearningManager({ dashboardHref, roleLabel }: ManagerPro
           )}
         </section>
       </section>
+
+      {previewMaterial ? (
+        <div className={styles.previewOverlay}>
+          <section className={styles.previewDialog} role="dialog" aria-modal="true" aria-labelledby="learning-preview-title">
+            <header className={styles.previewHeader}>
+              <div>
+                <span className={styles.eyebrow}>{previewMaterial.material_type === "note" ? "SEMAKAN NOTA" : "SEMAKAN PDF"} · {previewMaterial.is_published ? "DITERBITKAN" : "DRAF"}</span>
+                <h2 id="learning-preview-title">{previewMaterial.title}</h2>
+                {previewMaterial.description ? <p>{previewMaterial.description}</p> : null}
+              </div>
+              <button type="button" className={styles.smallButton} onClick={closeMaterialPreview}>Tutup</button>
+            </header>
+            <div className={styles.previewBody}>
+              {previewMaterial.material_type === "note" ? (
+                <div className={styles.previewNote}>{previewMaterial.content || "Tiada kandungan nota."}</div>
+              ) : previewLoading ? (
+                <div className={styles.emptyState}>Sedang menyediakan pratonton PDF...</div>
+              ) : previewPdfUrl ? (
+                <iframe className={styles.previewFrame} src={previewPdfUrl} title={"Pratonton PDF: " + previewMaterial.title} />
+              ) : (
+                <div className={styles.emptyState}>Pratonton PDF tidak tersedia.</div>
+              )}
+            </div>
+            {previewMaterial.material_type === "pdf" && previewPdfUrl ? (
+              <div className={styles.previewFooter}>
+                <a className={styles.primaryLink} href={previewPdfUrl} target="_blank" rel="noreferrer">Buka PDF dalam tab baharu ↗</a>
+              </div>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
