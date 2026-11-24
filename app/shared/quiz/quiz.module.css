@@ -923,3 +923,11 @@ mark.studentMarkRepeat { background:#e8e4fb; color:#55448d; text-decoration:unde
   .classTopicSummaryGrid { grid-template-columns:1fr; }
   .classTopicSummaryHeading { align-items:flex-start; }
 }
+
+.optionEntryHint {
+  grid-column:1/-1;
+  margin:-3px 0 2px;
+  color:#71877a;
+  font-size:9px;
+  line-height:1.6;
+}

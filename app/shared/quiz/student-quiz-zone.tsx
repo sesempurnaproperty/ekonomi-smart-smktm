@@ -513,7 +513,7 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
                       <label key={option.id} className={answers[question.id]?.selected_option_id === option.id ? styles.choiceSelected : styles.choice}>
                         <input type="radio" name={question.id} checked={answers[question.id]?.selected_option_id === option.id} onChange={() => choose(question.id, option.id)} />
                         <span className={styles.choiceCode}>{option.option_code}</span>
-                        <span>{option.option_text}</span>
+                        {option.option_text?<span>{option.option_text}</span>:null}
                       </label>
                     ))}
                   </div>
