@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import "./visual-system.css";
+import ThemeSwitcher from "./theme/theme-switcher";
 
 export const metadata: Metadata = {
   title: "Ekonomi Smart SMKTM | Fahami Ekonomi, Fahami Dunia",
@@ -9,8 +11,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#071923"
+  themeColor: "#665ae8"
 };
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return <html lang="ms"><body>{children}</body></html>;
+  return <html lang="ms"><body>{children}<ThemeSwitcher /></body></html>;
 }
