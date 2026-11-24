@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createClient } from "../../../lib/supabase/client";
 import styles from "./quiz.module.css";
@@ -344,6 +345,21 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
         {error ? <div className={styles.errorBox}>{error}</div> : null}
         {notice ? <div className={styles.noticeBox}>{notice}</div> : null}
 
+        {result ? (
+          <section className={styles.resultCard+ " " +styles.resultCardComplete} aria-live="polite">
+            <span className={styles.eyebrow}>PENGHANTARAN BERJAYA</span>
+            <h2>Jawapan telah direkodkan</h2>
+            <div className={styles.resultScore}><strong>{displayMark(result.objective_score)}</strong><span>/ {displayMark(result.max_score)} markah maksimum</span></div>
+            <p>{result.pending_review_questions
+              ? result.pending_review_questions + " soalan struktur menunggu semakan guru. Markah akhir akan dikemas kini selepas penilaian."
+              : "Semua soalan dinilai secara automatik. Ini markah akhir percubaan."}</p>
+            <div className={styles.resultActions}>
+              <Link className={styles.primaryButton} href="/murid/dashboard">Kembali ke Dashboard</Link>
+              <button className={styles.secondaryButton} type="button" onClick={() => setResult(null)}>Lihat rekod markah</button>
+            </div>
+          </section>
+        ) : null}
+
         {!active ? (
           <section className={styles.studentScoreSection}>
             <div className={styles.scoreSectionHeading}>
@@ -472,18 +488,6 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
                 })}
               </div>
             )}
-          </section>
-        ) : null}
-
-        {result ? (
-          <section className={styles.resultCard}>
-            <span className={styles.eyebrow}>PENGHANTARAN BERJAYA</span>
-            <h2>Jawapan telah direkodkan</h2>
-            <div className={styles.resultScore}><strong>{displayMark(result.objective_score)}</strong><span>/ {displayMark(result.max_score)} markah maksimum</span></div>
-            <p>{result.pending_review_questions
-              ? result.pending_review_questions + " soalan struktur menunggu semakan guru. Markah akhir akan dikemas kini selepas penilaian."
-              : "Semua soalan dinilai secara automatik. Ini markah akhir percubaan."}</p>
-            <button className={styles.secondaryButton} type="button" onClick={() => setResult(null)}>Tutup</button>
           </section>
         ) : null}
 
