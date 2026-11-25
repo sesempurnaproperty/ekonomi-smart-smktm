@@ -95,7 +95,7 @@ export default function Home() {
 
       <header className="site-header">
         <a className="brand" href="#utama" aria-label="Ekonomi Smart SMKTM">
-          <span className="brand-mark">ES</span>
+          <span className="brand-mark"><img src="/smk-taman-medan-logo.png" alt="Logo SMK Taman Medan" /></span>
           <span className="brand-text">
             <strong>EKONOMI<span>SMART</span></strong>
             <small>SMK TAMAN MEDAN</small>
@@ -220,7 +220,7 @@ export default function Home() {
 
       <footer className="site-footer">
         <a className="brand footer-brand" href="#utama">
-          <span className="brand-mark">ES</span>
+          <span className="brand-mark"><img src="/smk-taman-medan-logo.png" alt="Logo SMK Taman Medan" /></span>
           <span className="brand-text">
             <strong>EKONOMI<span>SMART</span></strong>
             <small>SMK TAMAN MEDAN</small>

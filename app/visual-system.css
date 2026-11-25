@@ -474,3 +474,10 @@ html[data-theme="dark"] [class*="formPanel"] input, html[data-theme="dark"] [cla
   [class*="dashboardGrid"] { grid-template-columns: 1fr !important; }
   [class*="moduleCard"] { min-height: 160px; }
 }
+
+
+/* Official SMK Taman Medan crest replaces the former ES monogram. */
+.brand-mark, [class*="brandMark"] { width:48px !important; height:56px !important; flex:0 0 48px; display:inline-flex !important; align-items:center; justify-content:center; overflow:visible !important; background:transparent !important; border-radius:0 !important; box-shadow:none !important; position:relative; }
+.brand-mark::after, [class*="brandMark"]::after { content:none !important; display:none !important; }
+.brand-mark img, [class*="brandMark"] img { display:block; width:100%; height:100%; object-fit:contain; object-position:center; }
+@media(max-width:720px) { .brand-mark, [class*="brandMark"] { width:43px !important; height:50px !important; flex-basis:43px; } }

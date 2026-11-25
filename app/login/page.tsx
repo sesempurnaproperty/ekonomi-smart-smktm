@@ -14,7 +14,7 @@ export default function PortalLoginPage() {
       <div className={styles.loginLayout}>
         <section className={styles.brandPanel}>
           <Link className={styles.brand} href="/" aria-label="Ekonomi Smart SMKTM">
-            <span className={styles.brandMark}>ES</span>
+            <span className={styles.brandMark}><img src="/smk-taman-medan-logo.png" alt="Logo SMK Taman Medan" /></span>
             <span className={styles.brandText}>
               <strong>EKONOMI<span>SMART</span></strong>
               <small>SMK TAMAN MEDAN</small>
