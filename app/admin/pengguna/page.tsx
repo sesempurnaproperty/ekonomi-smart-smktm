@@ -23,7 +23,7 @@ export default async function UserManagementPage() {
     <main className={styles.dashboardShell}>
       <header className={styles.dashboardHeader}>
         <Link className={styles.brand} href="/" aria-label="Ekonomi Smart SMKTM">
-          <span className={styles.brandMark}>ES</span>
+          <span className={styles.brandMark}><img src="/smk-taman-medan-logo.png" alt="Logo SMK Taman Medan" /></span>
           <span className={styles.brandText}>
             <strong>EKONOMI<span>SMART</span></strong>
             <small>PENGURUSAN SISTEM · SMK TAMAN MEDAN</small>
