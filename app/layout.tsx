@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#665ae8"
+  themeColor: "#087de1"
 };
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return <html lang="ms"><body>{children}<ThemeSwitcher /></body></html>;

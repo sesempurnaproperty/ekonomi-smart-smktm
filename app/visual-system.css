@@ -146,7 +146,7 @@ html[data-theme="dark"] .theme-switcher-thumb { transform: translateX(12px); bac
 .accountCard {
   border: 1px solid var(--app-border) !important;
   border-radius: 18px !important;
-  background: linear-gradient(110deg, #fff, #f1f1ff) !important;
+  background: linear-gradient(110deg, #fff, #edf4fa) !important;
   box-shadow: var(--app-shadow-soft);
 }
 .accountCard small { color: var(--app-muted) !important; }
@@ -394,7 +394,7 @@ html[data-theme="dark"] .previewNote { background: #1c324a !important; border-co
 [class*="dashboardTitle"] { color: var(--app-text) !important; letter-spacing: -.055em; }
 [class*="dashboardTitle"] em { background: linear-gradient(90deg,#087de1,#2daa48); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 [class*="dashboardIntro"] { color: var(--app-muted) !important; }
-[class*="accountCard"] { border: 1px solid var(--app-border) !important; border-radius: 18px !important; background: linear-gradient(110deg,#fff,#f1f1ff) !important; box-shadow: var(--app-shadow-soft); }
+[class*="accountCard"] { border: 1px solid var(--app-border) !important; border-radius: 18px !important; background: linear-gradient(110deg,#fff,#edf4fa) !important; box-shadow: var(--app-shadow-soft); }
 [class*="accountCard"] small { color: var(--app-muted) !important; }
 [class*="accountCard"] strong { color: var(--app-text) !important; }
 [class*="accountCard"] > span { color: var(--app-primary) !important; }
