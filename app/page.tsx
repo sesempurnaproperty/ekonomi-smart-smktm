@@ -108,7 +108,7 @@ export default function Home() {
           <a href="#tentang">Tentang</a>
         </nav>
         <a className="student-link" href="/login">Log masuk portal <span>↗</span></a>
-        <a className="mobile-nav" href="#modul" aria-label="Pergi ke modul">☰</a>
+        <a className="mobile-nav" href="/login" aria-label="Log masuk portal">Log masuk <span aria-hidden="true">↗</span></a>
       </header>
 
       <section className="hero" id="utama">
