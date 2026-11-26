@@ -264,6 +264,14 @@ export default function LearningManager({ dashboardHref, roleLabel }: ManagerPro
   async function deleteChapter(chapter: Chapter) {
     if (deletingChapterId) return;
 
+    // Preview currently uses the shared Production Supabase project. Keep
+    // destructive deletion disabled outside the official Production domain.
+    if (window.location.hostname !== "ekonomi-smart-smktm.vercel.app") {
+      setError("Fungsi padam dinyahaktifkan pada Preview kerana ia menggunakan pangkalan data Production. Pemadaman hanya tersedia pada laman rasmi selepas pelancaran.");
+      setNotice("");
+      return;
+    }
+
     setDeletingChapterId(chapter.id);
     setError("");
     setNotice("");
