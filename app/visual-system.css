@@ -510,3 +510,19 @@ html[data-theme="dark"] .mobile-nav { color:#fff !important; border-color:#78b9f
  [class*="dashboardHeader"] [class*="brandText"] strong{font-size:9px!important;letter-spacing:.04em!important}
 }
 @media(min-width:721px){.mobile-header-actions{display:none!important}}
+
+/* Reuse the same compact role header on quiz and learning workspace pages. */
+@media(max-width:720px){
+ [class*="topBar"]{position:relative!important;z-index:100!important;width:100%;min-height:68px!important;height:auto!important;box-sizing:border-box;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;padding:8px 3.5%!important;overflow:visible!important}
+ [class*="topBar"]>[class*="brand"]{display:flex!important;flex:1 1 auto!important;min-width:0!important;max-width:none!important;align-items:center!important;gap:7px!important;overflow:hidden}
+ [class*="topBar"] [class*="brandMark"]{flex:0 0 36px!important;width:36px!important;height:42px!important}
+ [class*="topBar"] [class*="brandText"]{min-width:0!important;flex:1 1 auto!important;overflow:hidden}
+ [class*="topBar"] [class*="brand"] strong{display:block;font-size:10px!important;line-height:1.2;letter-spacing:.07em!important;white-space:nowrap}
+ [class*="topBar"] [class*="brand"] small{display:none!important}
+ [class*="topBar"] [class*="topActions"]{display:none!important}
+}
+@media(max-width:360px){
+ [class*="topBar"]{padding-left:3%!important;padding-right:3%!important;gap:5px!important}
+ [class*="topBar"] [class*="brandMark"]{flex-basis:32px!important;width:32px!important;height:38px!important}
+ [class*="topBar"] [class*="brand"] strong{font-size:9px!important;letter-spacing:.04em!important}
+}

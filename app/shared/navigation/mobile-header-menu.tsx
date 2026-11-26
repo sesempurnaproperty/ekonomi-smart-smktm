@@ -1,10 +1,12 @@
+ "use client";
+
 import Link from "next/link";
 import styles from "./mobile-header-menu.module.css";
 import TeacherLogoutButton from "../../guru/dashboard/logout-button";
 
 export type HeaderMenuItem = { label: string; href: string };
 type MobileHeaderMenuProps = {
-  roleLabel: "PENTADBIR" | "GURU" | "MURID";
+  roleLabel: string;
   items: HeaderMenuItem[];
 };
 
