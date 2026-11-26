@@ -526,3 +526,7 @@ html[data-theme="dark"] .mobile-nav { color:#fff !important; border-color:#78b9f
  [class*="topBar"] [class*="brandMark"]{flex-basis:32px!important;width:32px!important;height:38px!important}
  [class*="topBar"] [class*="brand"] strong{font-size:9px!important;letter-spacing:.04em!important}
 }
+
+@media(max-width:720px){
+ [class*="topBar"]>[class*="roleBadge"]{display:none!important}
+}
