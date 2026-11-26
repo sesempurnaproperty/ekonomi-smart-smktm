@@ -518,7 +518,7 @@ async function getManageableQuiz(
   }
 
   const quizRows = await getRows(supabaseUrl, secretKey, "learning_quizzes", {
-    select: "id,title,created_by,target_form_level,status",
+    select: "id,title,created_by,target_form_level,status,syllabus_chapter_id",
     id: "eq." + quizId,
     limit: "1"
   });
@@ -928,6 +928,7 @@ async function submitAttempt(
   }
   const { questions, options } = await getQuestionsAndOptions(supabaseUrl, secretKey, String(attempt.quiz_id));
   if (!questions.length) return { error: "Soalan kuiz tidak ditemui.", status: 409 };
+  const currentMaxScore = questions.reduce((sum, question) => sum + asNumber(question.marks), 0);
 
   const ids = questions.map((q) => String(q.id));
   const keys = await getRows(supabaseUrl, secretKey, "quiz_answer_keys", {
@@ -987,6 +988,7 @@ async function submitAttempt(
     objective_score: objectiveScore,
     teacher_score: structuredCount > 0 ? null : 0,
     total_score: objectiveScore,
+    max_score: currentMaxScore,
     graded_at: structuredCount > 0 ? null : new Date().toISOString()
   });
   if (!updated.length) return { error: "Jawapan tidak dapat disimpan. Muat semula dan hubungi guru.", status: 409 };
@@ -995,9 +997,109 @@ async function submitAttempt(
     attempt_id: attemptId,
     status,
     objective_score: objectiveScore,
-    max_score: asNumber(attempt.max_score),
+    max_score: currentMaxScore,
     pending_review_questions: structuredCount
   };
+}
+
+async function createQuizQuestion(
+  supabaseUrl: string,
+  secretKey: string,
+  quizId: string,
+  profile: JsonRecord,
+  callerId: string,
+  input: JsonRecord
+) {
+  const access = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
+  if (!access.quiz) return { error: access.error ?? "Akses kuiz ditolak.", status: access.status ?? 403 };
+
+  const questionType = input.question_type === "objective" || input.question_type === "structured"
+    ? input.question_type
+    : null;
+  const prompt = typeof input.prompt === "string" ? input.prompt.trim().slice(0, 12000) : "";
+  const imagePath = typeof input.image_path === "string" && input.image_path.length > 0
+    ? input.image_path
+    : null;
+  const marks = Number(input.marks);
+  const topicId = typeof input.syllabus_topic_id === "string" ? input.syllabus_topic_id : "";
+  if (!questionType) return { error: "Jenis soalan tidak sah.", status: 400 };
+  if (!prompt && !imagePath) return { error: "Masukkan teks soalan atau lampirkan gambar soalan.", status: 400 };
+  if (!Number.isFinite(marks) || marks < 0.5 || marks > 1000) return { error: "Markah soalan tidak sah.", status: 400 };
+  if (!topicId) return { error: "Pilih bab kecil atau subbab silibus.", status: 400 };
+  if (imagePath && !imagePath.startsWith(quizId + "/")) return { error: "Laluan gambar soalan tidak sah.", status: 400 };
+
+  const topics = await getRows(supabaseUrl, secretKey, "syllabus_topics", {
+    select: "id,chapter_id",
+    id: "eq." + topicId,
+    is_active: "eq.true",
+    limit: "1"
+  });
+  if (!topics.length) return { error: "Subbab silibus tidak ditemui atau tidak aktif.", status: 400 };
+  if (access.quiz.syllabus_chapter_id && String(topics[0].chapter_id) !== String(access.quiz.syllabus_chapter_id)) {
+    return { error: "Subbab yang dipilih tidak sepadan dengan fokus bab kuiz ini.", status: 400 };
+  }
+
+  const currentQuestions = await getRows(supabaseUrl, secretKey, "quiz_questions", {
+    select: "id,question_order",
+    quiz_id: "eq." + quizId,
+    order: "question_order.asc",
+    limit: "500"
+  });
+  if (currentQuestions.length >= 200) return { error: "Kuiz telah mencapai had 200 soalan.", status: 409 };
+
+  const optionValues = Array.isArray(input.options) ? input.options : [];
+  const optionCodes = ["A", "B", "C", "D"];
+  if (questionType === "objective") {
+    if (optionValues.length !== 4) return { error: "Soalan objektif memerlukan empat pilihan jawapan.", status: 400 };
+    if (!imagePath && optionValues.some((value) => typeof value !== "string" || !value.trim())) {
+      return { error: "Lengkapkan pilihan A, B, C dan D, atau gunakan gambar yang mengandungi pilihan jawapan.", status: 400 };
+    }
+    if (typeof input.correct_option_code !== "string" || !optionCodes.includes(input.correct_option_code)) {
+      return { error: "Pilih jawapan betul untuk pemarkahan automatik.", status: 400 };
+    }
+  }
+
+  const created = await insertRows(supabaseUrl, secretKey, "quiz_questions", [{
+    quiz_id: quizId,
+    question_order: currentQuestions.length + 1,
+    question_type: questionType,
+    prompt: prompt || "Lihat gambar soalan",
+    marks,
+    image_path: imagePath,
+    syllabus_topic_id: topicId
+  }]);
+  const question = created[0];
+  if (!question) return { error: "Soalan gagal disimpan.", status: 500 };
+
+  try {
+    let correctOptionId: string | null = null;
+    if (questionType === "objective") {
+      const optionRows = await insertRows(supabaseUrl, secretKey, "quiz_options", optionCodes.map((code, index) => ({
+        question_id: String(question.id),
+        option_code: code,
+        option_text: String(optionValues[index] ?? "").trim(),
+        option_order: index + 1
+      })));
+      const correct = optionRows.find((option) => option.option_code === input.correct_option_code);
+      if (!correct) throw new Error("Pilihan jawapan betul gagal disimpan.");
+      correctOptionId = String(correct.id);
+    }
+
+    await insertRows(supabaseUrl, secretKey, "quiz_answer_keys", [{
+      question_id: String(question.id),
+      correct_option_id: correctOptionId,
+      marking_guide: questionType === "structured" && typeof input.marking_guide === "string" ? input.marking_guide.trim() : null,
+      updated_by: callerId,
+      updated_at: new Date().toISOString()
+    }], "question_id");
+
+    // Existing attempts retain their saved state; submitAttempt recalculates the current maximum.
+
+    return { question, message: "Soalan berjaya ditambah." };
+  } catch (error) {
+    await deleteRows(supabaseUrl, secretKey, "quiz_questions", { id: "eq." + String(question.id) });
+    throw error;
+  }
 }
 
 async function setAnswerKey(
@@ -1427,6 +1529,9 @@ Deno.serve(async (req: Request) => {
       if (profile.role !== "student") return send({ error: "Tindakan ini khusus untuk murid." }, 403, origin);
       if (typeof body.attempt_id !== "string") return send({ error: "ID percubaan tidak sah." }, 400, origin);
       result = await submitAttempt(supabaseUrl, secretKey, body.attempt_id, callerId, body.answers);
+    } else if (action === "create_question") {
+      if (typeof body.quiz_id !== "string") return send({ error: "ID kuiz tidak sah." }, 400, origin);
+      result = await createQuizQuestion(supabaseUrl, secretKey, body.quiz_id, profile, callerId, body);
     } else if (action === "save_answer_key") {
       if (typeof body.question_id !== "string") return send({ error: "ID soalan tidak sah." }, 400, origin);
       result = await setAnswerKey(

@@ -282,39 +282,20 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     if(uploadError)throw new Error(uploadError.message);
    }
 
-   const {data:q,error:qErr}=await s.from("quiz_questions").insert({
+   const {data:created,error:createError}=await s.functions.invoke("quiz-engine",{body:{
+    action:"create_question",
     quiz_id:quizId,
-    question_order:questions.length+1,
     question_type:form.kind,
     prompt:form.prompt.trim()||(imagePath?"Lihat gambar soalan":""),
     marks:Number(form.marks),
     image_path:imagePath,
-    syllabus_topic_id:form.syllabusTopicId
-   }).select("*").single();
-   if(qErr||!q)throw new Error(qErr?.message??"Soalan gagal disimpan.");
-   createdQuestionId=q.id;
-
-   let correctId:string|null=null;
-   if(form.kind==="objective"){
-    const {data:o,error:oErr}=await s.from("quiz_options").insert(
-     form.options.map((value,index)=>({
-      question_id:q.id,
-      option_code:["A","B","C","D"][index],
-      option_text:value.trim(),
-      option_order:index+1
-     }))
-    ).select("*");
-    if(oErr||!o)throw new Error(oErr?.message??"Pilihan jawapan gagal disimpan.");
-    correctId=(o as Option[]).find(option=>option.option_code===form.correct)?.id??null;
-   }
-
-   const {data:k,error:kErr}=await s.functions.invoke("quiz-engine",{body:{
-    action:"save_answer_key",
-    question_id:q.id,
-    correct_option_id:correctId,
+    syllabus_topic_id:form.syllabusTopicId,
+    options:form.kind==="objective"?form.options.map(value=>value.trim()):[],
+    correct_option_code:form.kind==="objective"?form.correct:null,
     marking_guide:form.kind==="structured"?form.guide.trim():null
    }});
-   if(kErr||k?.error)throw new Error(kErr?.message??k?.error??"Kunci jawapan gagal disimpan.");
+   if(createError||created?.error)throw new Error(createError?.message??created?.error??"Soalan gagal disimpan.");
+   createdQuestionId=created.question?.id??null;
 
    setForm({...fresh});
    if(imageInputRef.current)imageInputRef.current.value="";
@@ -447,11 +428,11 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
 </div></div>
  <div className={styles.questionLayout}><div><h3>Soalan ({questions.length})</h3>{questions.length===0?<p className={styles.emptyText}>Tambahkan soalan untuk membina kuiz.</p>:questions.map(q=><article className={styles.questionCard} key={q.id}><div className={styles.questionMeta}><span>SOALAN {q.question_order}</span><span>{q.question_type==="objective"?"OBJEKTIF":"STRUKTUR"}</span><span>{q.marks} markah</span></div><div className={styles.questionSyllabusTag}>{syllabusTopics.find(topic=>topic.id===q.syllabus_topic_id)?.topic_code} · {syllabusTopics.find(topic=>topic.id===q.syllabus_topic_id)?.title??"Subbab tidak ditemui"}</div>{q.image_url?<img className={styles.questionImagePreview} src={q.image_url} alt={"Gambar soalan "+q.question_order}/>:null}{q.prompt!=="Lihat gambar soalan"?<p>{q.prompt}</p>:null}{q.question_type==="objective"?<ol className={styles.optionList} type="A">{options.filter(o=>o.question_id===q.id).map(o=><li key={o.id}>{o.option_text||"Pilihan terdapat dalam gambar"}</li>)}</ol>:<small>Jawapan struktur — ditanda secara manual.</small>}
  <div className={styles.questionCardActions}>
-  <span>{selected.status==="published"?"Tarik balik kuiz untuk mengubah soalan.":attempts.length>0?"Reset percubaan sebelum memadam soalan.":"Soalan boleh dipadam."}</span>
+  <span>{selected.status==="published"?"Kuiz diterbitkan — soalan baharu boleh ditambah.":attempts.length>0?"Reset percubaan sebelum memadam soalan.":"Soalan boleh dipadam."}</span>
   <button className={styles.questionDeleteButton} type="button" disabled={busy||selected.status==="published"} onClick={()=>void removeQuestion(q)}>Padam soalan</button>
  </div>
 </article>)}</div>
- <div className={styles.addQuestionBox}><h3>Tambah soalan</h3><form className={styles.form} onSubmit={addQuestion}><label>Jenis<select value={form.kind} onChange={e=>setForm({...form,kind:e.target.value as "objective"|"structured"})}><option value="objective">Objektif automatik</option><option value="structured">Struktur manual</option></select></label><label>Markah<input type="number" min="0.5" step="0.5" value={form.marks} onChange={e=>setForm({...form,marks:e.target.value})}/></label>
+ <div className={styles.addQuestionBox}><h3>Tambah soalan</h3><p className={styles.panelSub}>Gambar adalah pilihan. Soalan teks sahaja, gambar sahaja atau gabungan kedua-duanya dibenarkan. Soalan baharu boleh ditambah walaupun kuiz telah diterbitkan.</p><form className={styles.form} onSubmit={addQuestion}><label>Jenis<select value={form.kind} onChange={e=>setForm({...form,kind:e.target.value as "objective"|"structured"})}><option value="objective">Objektif automatik</option><option value="structured">Struktur manual</option></select></label><label>Markah<input type="number" min="0.5" step="0.5" value={form.marks} onChange={e=>setForm({...form,marks:e.target.value})}/></label>
  <label className={styles.fullWidth}>Bab kecil / subbab silibus<select required value={form.syllabusTopicId} onChange={e=>setForm({...form,syllabusTopicId:e.target.value})}>
   <option value="">Pilih subbab bagi soalan ini</option>
   {syllabusTopics.filter(topic=>!selected?.syllabus_chapter_id||topic.chapter_id===selected.syllabus_chapter_id).map(topic=><option key={topic.id} value={topic.id}>{topic.topic_code} · {topic.title}</option>)}
@@ -465,13 +446,13 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   </div>
   <label className={styles.imageUploadButton}>
    {form.imageFile?"Tukar gambar":"Pilih gambar soalan"}
-   <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>chooseQuestionImage(event.currentTarget.files?.[0]??null)} disabled={busy||selected?.status==="published"}/>
+   <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>chooseQuestionImage(event.currentTarget.files?.[0]??null)} disabled={busy}/>
   </label>
   {form.imagePreviewUrl?<div className={styles.questionImageLocalPreview}>
    <img src={form.imagePreviewUrl} alt="Pratonton gambar soalan yang dipilih"/>
    <button type="button" className={styles.removeQuestionImageButton} disabled={busy} onClick={clearQuestionImage}>Buang gambar</button>
   </div>:null}
- </div>{form.kind==="objective"?<>{form.options.map((v,i)=><label key={i}>Pilihan {["A","B","C","D"][i]}<input required={!form.imageFile} value={v} onChange={e=>setForm(x=>({...x,options:x.options.map((o,j)=>i===j?e.target.value:o)}))} placeholder={form.imageFile?"Sudah tertera dalam gambar — boleh dikosongkan":"Masukkan teks pilihan jawapan"}/></label>)}{form.imageFile?<p className={styles.optionEntryHint}>Pilihan A, B, C dan D boleh dikosongkan kerana sudah terdapat dalam gambar. Ruang yang dikosongkan akan dipaparkan kepada murid sebagai huruf pilihan sahaja. Pilih jawapan betul untuk pemarkahan automatik.</p>:null}<label className={styles.fullWidth}>Jawapan betul — wajib untuk pemarkahan automatik<select value={form.correct} onChange={e=>setForm({...form,correct:e.target.value})}>{["A","B","C","D"].map(x=><option key={x}>{x}</option>)}</select></label></>:<label className={styles.fullWidth}>Panduan pemarkahan guru<textarea rows={3} value={form.guide} onChange={e=>setForm({...form,guide:e.target.value})}/><small>Tidak dipaparkan kepada murid.</small></label>}<button className={styles.primaryButton} disabled={busy||selected?.status==="published"}>{busy?"Menyimpan...":"Tambah soalan"}</button></form></div></div></section>
+ </div>{form.kind==="objective"?<>{form.options.map((v,i)=><label key={i}>Pilihan {["A","B","C","D"][i]}<input required={!form.imageFile} value={v} onChange={e=>setForm(x=>({...x,options:x.options.map((o,j)=>i===j?e.target.value:o)}))} placeholder={form.imageFile?"Sudah tertera dalam gambar — boleh dikosongkan":"Masukkan teks pilihan jawapan"}/></label>)}{form.imageFile?<p className={styles.optionEntryHint}>Pilihan A, B, C dan D boleh dikosongkan kerana sudah terdapat dalam gambar. Ruang yang dikosongkan akan dipaparkan kepada murid sebagai huruf pilihan sahaja. Pilih jawapan betul untuk pemarkahan automatik.</p>:null}<label className={styles.fullWidth}>Jawapan betul — wajib untuk pemarkahan automatik<select value={form.correct} onChange={e=>setForm({...form,correct:e.target.value})}>{["A","B","C","D"].map(x=><option key={x}>{x}</option>)}</select></label></>:<label className={styles.fullWidth}>Panduan pemarkahan guru<textarea rows={3} value={form.guide} onChange={e=>setForm({...form,guide:e.target.value})}/><small>Tidak dipaparkan kepada murid.</small></label>}<button className={styles.primaryButton} disabled={busy}>{busy?"Menyimpan...":"Tambah soalan"}</button></form></div></div></section>
  <section className={styles.panel+" "+styles.reviewPanel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>LANGKAH 3</span><h2>Keputusan dan semakan</h2></div><button className={styles.textButton} type="button" onClick={()=>void detail()}>Muat semula</button></div>{roster.length>0?<section className={styles.markCollectionPanel}>
  <div className={styles.markCollectionHeading}><div><span className={styles.eyebrow}>RUMUSAN KELAS</span><h3>Kutipan markah setiap murid</h3><p>Senarai ini hanya memaparkan murid dalam kelas yang berada di bawah penugasan akaun guru. Markah terbaik dikira sekali bagi setiap murid.</p></div><span className={styles.markCollectionCount}>{studentSummaries.length} MURID</span></div>
  <div className={styles.markCollectionStats}>
