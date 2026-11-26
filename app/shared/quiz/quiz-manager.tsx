@@ -4,15 +4,6 @@ import MobileHeaderMenu from "../navigation/mobile-header-menu";
 import {Fragment,FormEvent,useCallback,useEffect,useMemo,useRef,useState,type ReactNode} from "react";
 import {createClient} from "../../../lib/supabase/client";
 import styles from "./quiz.module.css";
-async function fileToBase64(file:File):Promise<string>{
- const bytes=new Uint8Array(await file.arrayBuffer());
- let binary="";
- const chunkSize=0x8000;
- for(let offset=0;offset<bytes.length;offset+=chunkSize){
-  binary+=String.fromCharCode(...bytes.subarray(offset,Math.min(offset+chunkSize,bytes.length)));
- }
- return btoa(binary);
-}
 type Quiz={id:string;title:string;description:string|null;target_form_level:number|null;chapter_id:string|null;syllabus_chapter_id:string;attempt_limit:number;status:string};
 type Chapter={id:string;form_level:number;chapter_number:number;title:string};
 type SyllabusChapter={id:string;chapter_number:number;title:string;display_order:number};
@@ -44,7 +35,7 @@ function renderMarkedAnswer(text:string,annotations:MarkAnnotation[]|null|undefi
 }
 type A={id:string;student_id:string;attempt_number:number;status:string;total_score:number;max_score:number;student:{full_name:string;form_level:number;class_name:string}|null;responses:R[]};
 type StudentRoster={user_id:string;full_name:string;form_level:number;class_name:string;academic_class_id:string};
-const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:"",syllabusTopicId:"",imageFile:null as File|null,imagePreviewUrl:""};
+const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:"",syllabusTopicId:"",imageFile:null as {type:string;size:number}|null,imageBase64:"",imagePreviewUrl:""};
 function getMobileMenuItems(roleLabel: string) {
   if (roleLabel === "PENTADBIR") return [
     {label:"Dashboard pentadbir",href:"/admin/dashboard"},
@@ -104,7 +95,6 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  useEffect(()=>{
   setForm(current=>({...current,syllabusTopicId:""}));
  },[quizId]);
- useEffect(()=>()=>{if(form.imagePreviewUrl)URL.revokeObjectURL(form.imagePreviewUrl);},[form.imagePreviewUrl]);
  const detail=useCallback(async()=>{
   if(!quizId){setQuestions([]);setOptions([]);setAttempts([]);setRoster([]);return;}
   const [q,o,a]=await Promise.all([
@@ -240,7 +230,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   setQuizId(data.id);setNotice("Kuiz dicipta sebagai draf di bawah bab silibus yang dipilih.");
   await refresh();
  }
- function chooseQuestionImage(file:File|null){
+ async function chooseQuestionImage(file:File|null){
   if(!file)return;
   const allowed=["image/jpeg","image/png","image/webp"];
   if(!allowed.includes(file.type)){
@@ -248,17 +238,34 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    if(imageInputRef.current)imageInputRef.current.value="";
    return;
   }
-  if(file.size>5*1024*1024){
-   setError("Saiz gambar melebihi 5 MB. Kecilkan gambar sebelum dimuat naik.");
+  if(file.size>4*1024*1024){
+   setError("Saiz gambar maksimum ialah 4 MB. Kecilkan gambar sebelum dimuat naik.");
    if(imageInputRef.current)imageInputRef.current.value="";
    return;
   }
-  setForm(current=>({...current,imageFile:file,imagePreviewUrl:URL.createObjectURL(file)}));
-  setError("");
+  // Read the selected file immediately while the Android document-provider
+  // grant is active. Do not retain a File handle for a later async read.
+  const reader=new FileReader();
+  reader.onload=()=>{
+   const dataUrl=typeof reader.result==="string"?reader.result:"";
+   const comma=dataUrl.indexOf(",");
+   if(comma<0){
+    setError("Fail gambar tidak dapat dibaca. Sila pilih gambar semula.");
+    if(imageInputRef.current)imageInputRef.current.value="";
+    return;
+   }
+   setForm(current=>({...current,imageFile:{type:file.type,size:file.size},imageBase64:dataUrl.slice(comma+1),imagePreviewUrl:dataUrl}));
+   setError("");
+  };
+  reader.onerror=()=>{
+   setError("Telefon tidak dapat membaca fail gambar. Cuba pilih gambar daripada Galeri telefon.");
+   if(imageInputRef.current)imageInputRef.current.value="";
+  };
+  reader.readAsDataURL(file);
  }
 
  function clearQuestionImage(){
-  setForm(current=>({...current,imageFile:null,imagePreviewUrl:""}));
+  setForm(current=>({...current,imageFile:null,imageBase64:"",imagePreviewUrl:""}));
   if(imageInputRef.current)imageInputRef.current.value="";
  }
 
@@ -282,7 +289,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   try{
    if(form.imageFile){
     if(form.imageFile.size>4*1024*1024)throw new Error("Saiz gambar maksimum ialah 4 MB. Sila kecilkan gambar dan cuba semula.");
-    const imageBase64=await fileToBase64(form.imageFile);
+    const imageBase64=form.imageBase64;\n    if(!imageBase64)throw new Error("Data gambar belum tersedia. Sila pilih semula gambar.");
     const {data:uploaded,error:uploadError}=await s.functions.invoke("quiz-engine",{body:{
      action:"upload_question_image",
      quiz_id:quizId,
