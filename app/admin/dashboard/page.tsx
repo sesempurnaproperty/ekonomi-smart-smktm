@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getCurrentProfile } from "../../../lib/auth/get-current-profile";
 import styles from "../../guru/guru.module.css";
 import TeacherLogoutButton from "../../guru/dashboard/logout-button";
+import MobileHeaderMenu from "../../shared/navigation/mobile-header-menu";
 
 export const metadata: Metadata = {
   title: "Dashboard Pentadbir | Ekonomi Smart SMKTM",
@@ -32,6 +33,7 @@ export default async function AdminDashboardPage() {
           <span className={styles.brandText}><strong>EKONOMI<span>SMART</span></strong><small>PORTAL PENTADBIR · SMK TAMAN MEDAN</small></span>
         </Link>
         <div className={styles.dashboardActions}><span className={styles.teacherBadge}>PENTADBIR</span><TeacherLogoutButton /></div>
+      <div className="mobile-header-actions"><MobileHeaderMenu roleLabel="PENTADBIR" items={[{label:"Dashboard pentadbir",href:"/admin/dashboard"},{label:"Pengurusan pengguna",href:"/admin/pengguna"},{label:"Pengurusan kelas",href:"/admin/kelas"},{label:"Rekod markah",href:"/admin/markah"},{label:"Analitik pencapaian",href:"/admin/analitik"},{label:"Bahan pembelajaran",href:"/admin/pembelajaran"},{label:"Pentaksiran dan kuiz",href:"/admin/kuiz"}]} /></div>
       </header>
       <section className={styles.dashboardMain}>
         <span className={styles.dashboardKicker}>PUSAT KAWALAN SISTEM</span>

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getCurrentProfile } from "../../../lib/auth/get-current-profile";
 import styles from "../../guru/guru.module.css";
 import TeacherLogoutButton from "../../guru/dashboard/logout-button";
+import MobileHeaderMenu from "../../shared/navigation/mobile-header-menu";
 import StudentPerformance from "./student-performance";
 
 export const metadata: Metadata = {
@@ -30,6 +31,7 @@ export default async function StudentDashboardPage() {
           <span className={styles.brandText}><strong>EKONOMI<span>SMART</span></strong><small>RUANG PEMBELAJARAN MURID</small></span>
         </Link>
         <div className={styles.dashboardActions}><span className={styles.teacherBadge}>MURID</span><TeacherLogoutButton /></div>
+      <div className="mobile-header-actions"><MobileHeaderMenu roleLabel="MURID" items={[{label:"Dashboard murid",href:"/murid/dashboard"},{label:"Nota dan bahan pembelajaran",href:"/murid/pembelajaran"},{label:"Latihan dan kuiz",href:"/murid/kuiz"}]} /></div>
       </header>
       <section className={styles.dashboardMain}>
         <span className={styles.dashboardKicker}>RUANG PEMBELAJARAN ANDA</span>

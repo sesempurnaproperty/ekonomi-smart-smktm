@@ -491,3 +491,84 @@ html[data-theme="dark"] [class*="formPanel"] input, html[data-theme="dark"] [cla
 .mobile-nav:hover { color:#fff !important; filter:brightness(1.04); }
 html[data-theme="dark"] .mobile-nav { color:#fff !important; border-color:#78b9f4 !important; background:linear-gradient(110deg,#087de1,#2daa48) !important; }
 @media(max-width:380px) { .mobile-nav { min-width:94px; padding-left:12px; padding-right:12px; } }
+
+/* Mobile header: keep only the school identity, role and one compact More menu. */
+.mobile-header-actions{display:none}
+@media(max-width:720px){
+ [class*="dashboardHeader"]{position:relative!important;z-index:10010!important;width:100%;min-height:68px!important;height:auto!important;box-sizing:border-box;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;padding:8px 3.5%!important;overflow:visible!important}
+ [class*="dashboardHeader"]>[class*="brand"]{display:flex!important;flex:1 1 auto!important;min-width:0!important;max-width:none!important;align-items:center!important;gap:7px!important;overflow:hidden}
+ [class*="dashboardHeader"] [class*="brandMark"]{flex:0 0 36px!important;width:36px!important;height:42px!important}
+ [class*="dashboardHeader"] [class*="brandText"]{min-width:0!important;flex:1 1 auto!important;overflow:hidden}
+ [class*="dashboardHeader"] [class*="brandText"] strong{display:block;font-size:10px!important;line-height:1.2;letter-spacing:.07em!important;white-space:nowrap}
+ [class*="dashboardHeader"] [class*="brandText"] small{display:none!important}
+ [class*="dashboardHeader"] [class*="dashboardActions"]{display:none!important}
+ .mobile-header-actions{display:flex!important;flex:0 0 auto;min-width:0}
+}
+@media(max-width:360px){
+ [class*="dashboardHeader"]{padding-left:3%!important;padding-right:3%!important;gap:5px!important}
+ [class*="dashboardHeader"] [class*="brandMark"]{flex-basis:32px!important;width:32px!important;height:38px!important}
+ [class*="dashboardHeader"] [class*="brandText"] strong{font-size:9px!important;letter-spacing:.04em!important}
+}
+@media(min-width:721px){.mobile-header-actions{display:none!important}}
+
+/* Reuse the same compact role header on quiz and learning workspace pages. */
+@media(max-width:720px){
+ [class*="topBar"]{position:relative!important;z-index:10010!important;width:100%;min-height:68px!important;height:auto!important;box-sizing:border-box;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;padding:8px 3.5%!important;overflow:visible!important}
+ [class*="topBar"]>[class*="brand"]{display:flex!important;flex:1 1 auto!important;min-width:0!important;max-width:none!important;align-items:center!important;gap:7px!important;overflow:hidden}
+ [class*="topBar"] [class*="brandMark"]{flex:0 0 36px!important;width:36px!important;height:42px!important}
+ [class*="topBar"] [class*="brandText"]{min-width:0!important;flex:1 1 auto!important;overflow:hidden}
+ [class*="topBar"] [class*="brand"] strong{display:block;font-size:10px!important;line-height:1.2;letter-spacing:.07em!important;white-space:nowrap}
+ [class*="topBar"] [class*="brand"] small{display:none!important}
+ [class*="topBar"] [class*="topActions"]{display:none!important}
+}
+@media(max-width:360px){
+ [class*="topBar"]{padding-left:3%!important;padding-right:3%!important;gap:5px!important}
+ [class*="topBar"] [class*="brandMark"]{flex-basis:32px!important;width:32px!important;height:38px!important}
+ [class*="topBar"] [class*="brand"] strong{font-size:9px!important;letter-spacing:.04em!important}
+}
+
+@media(max-width:720px){
+ [class*="topBar"]>[class*="roleBadge"]{display:none!important}
+}
+
+
+/* Ensure the mobile three-dot menu is visible when phones use a desktop-width viewport. */
+@media (max-width: 1024px) {
+  .mobile-header-actions { display: flex !important; flex: 0 0 auto; min-width: 0; }
+  [class*="dashboardHeader"] {
+    position: relative !important;
+    z-index: 10010 !important;
+    width: 100%;
+    min-height: 68px !important;
+    height: auto !important;
+    box-sizing: border-box;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    padding: 8px 3.5% !important;
+    overflow: visible !important;
+  }
+  [class*="dashboardHeader"] > [class*="brand"] {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    align-items: center !important;
+    gap: 7px !important;
+    overflow: hidden;
+  }
+  [class*="dashboardHeader"] [class*="brandMark"] { flex: 0 0 36px !important; width: 36px !important; height: 42px !important; }
+  [class*="dashboardHeader"] [class*="brandText"] { min-width: 0 !important; flex: 1 1 auto !important; overflow: hidden; }
+  [class*="dashboardHeader"] [class*="brandText"] strong { display: block; font-size: 10px !important; line-height: 1.2; white-space: nowrap; }
+  [class*="dashboardHeader"] [class*="brandText"] small { display: none !important; }
+  [class*="dashboardHeader"] [class*="dashboardActions"] { display: none !important; }
+  [class*="topBar"] [class*="topActions"] { display: none !important; }
+}
+@media (max-width: 360px) {
+  [class*="dashboardHeader"] { padding-left: 3% !important; padding-right: 3% !important; gap: 5px !important; }
+  [class*="dashboardHeader"] [class*="brandMark"] { flex-basis: 32px !important; width: 32px !important; height: 38px !important; }
+  [class*="dashboardHeader"] [class*="brandText"] strong { font-size: 9px !important; letter-spacing: .04em !important; }
+}

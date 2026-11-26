@@ -5,6 +5,7 @@ import { getCurrentProfile } from "../../../../lib/auth/get-current-profile";
 import styles from "../../../guru/guru.module.css";
 import marksStyles from "../marks.module.css";
 import TeacherLogoutButton from "../../../guru/dashboard/logout-button";
+import MobileHeaderMenu from "../../../shared/navigation/mobile-header-menu";
 import ClassMarksManager from "./class-marks-manager";
 
 export const metadata: Metadata = {
@@ -25,7 +26,7 @@ export default async function ClassMarksPage({ params }: { params: Promise<{ cla
     <main className={styles.dashboardShell}>
       <header className={styles.dashboardHeader}>
         <Link className={styles.brand} href="/" aria-label="Ekonomi Smart SMKTM">
-          <span className={styles.brandMark}>ES</span>
+          <span className={styles.brandMark}><img src="/smk-taman-medan-logo.png" alt="Logo SMK Taman Medan" /></span>
           <span className={styles.brandText}>
             <strong>EKONOMI<span>SMART</span></strong>
             <small>KEMAS KINI MARKAH · SMK TAMAN MEDAN</small>
@@ -36,6 +37,7 @@ export default async function ClassMarksPage({ params }: { params: Promise<{ cla
           <span className={styles.teacherBadge}>PENTADBIR</span>
           <TeacherLogoutButton />
         </div>
+      <div className="mobile-header-actions"><MobileHeaderMenu roleLabel="PENTADBIR" items={[{label:"Dashboard pentadbir",href:"/admin/dashboard"},{label:"Pengurusan pengguna",href:"/admin/pengguna"},{label:"Pengurusan kelas",href:"/admin/kelas"},{label:"Rekod markah",href:"/admin/markah"},{label:"Analitik pencapaian",href:"/admin/analitik"},{label:"Bahan pembelajaran",href:"/admin/pembelajaran"},{label:"Pentaksiran dan kuiz",href:"/admin/kuiz"}]} /></div>
       </header>
       <section className={styles.dashboardMain}>
         <span className={styles.dashboardKicker}>PPT2026 · PAT2026</span>

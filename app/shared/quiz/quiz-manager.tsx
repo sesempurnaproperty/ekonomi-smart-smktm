@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import MobileHeaderMenu from "../navigation/mobile-header-menu";
 import {Fragment,FormEvent,useCallback,useEffect,useMemo,useRef,useState,type ReactNode} from "react";
 import {createClient} from "../../../lib/supabase/client";
 import styles from "./quiz.module.css";
@@ -35,6 +36,28 @@ function renderMarkedAnswer(text:string,annotations:MarkAnnotation[]|null|undefi
 type A={id:string;student_id:string;attempt_number:number;status:string;total_score:number;max_score:number;student:{full_name:string;form_level:number;class_name:string}|null;responses:R[]};
 type StudentRoster={user_id:string;full_name:string;form_level:number;class_name:string;academic_class_id:string};
 const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:"",syllabusTopicId:"",imageFile:null as File|null,imagePreviewUrl:""};
+function getMobileMenuItems(roleLabel: string) {
+  if (roleLabel === "PENTADBIR") return [
+    {label:"Dashboard pentadbir",href:"/admin/dashboard"},
+    {label:"Pengurusan pengguna",href:"/admin/pengguna"},
+    {label:"Pengurusan kelas",href:"/admin/kelas"},
+    {label:"Rekod markah",href:"/admin/markah"},
+    {label:"Analitik pencapaian",href:"/admin/analitik"},
+    {label:"Bahan pembelajaran",href:"/admin/pembelajaran"},
+    {label:"Pentaksiran dan kuiz",href:"/admin/kuiz"}
+  ];
+  if (roleLabel === "GURU") return [
+    {label:"Dashboard guru",href:"/guru/dashboard"},
+    {label:"Bahan pembelajaran",href:"/guru/pembelajaran"},
+    {label:"Pentaksiran dan kuiz",href:"/guru/kuiz"}
+  ];
+  return [
+    {label:"Dashboard murid",href:"/murid/dashboard"},
+    {label:"Nota dan bahan pembelajaran",href:"/murid/pembelajaran"},
+    {label:"Latihan dan kuiz",href:"/murid/kuiz"}
+  ];
+}
+
 export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:string;roleLabel:string}){
  const s=useMemo(()=>createClient(),[]);const [uid,setUid]=useState("");const [quizzes,setQuizzes]=useState<Quiz[]>([]);const [chapters,setChapters]=useState<Chapter[]>([]);const [syllabusChapters,setSyllabusChapters]=useState<SyllabusChapter[]>([]);const [syllabusTopics,setSyllabusTopics]=useState<SyllabusTopic[]>([]);
  const [quizId,setQuizId]=useState("");const [questions,setQuestions]=useState<Question[]>([]);const [options,setOptions]=useState<Option[]>([]);const [attempts,setAttempts]=useState<A[]>([]);const [attemptId,setAttemptId]=useState("");const [roster,setRoster]=useState<StudentRoster[]>([]);
@@ -405,7 +428,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   setNotice("Markah, ulasan dan tanda pada jawapan berjaya disimpan bersama. Murid boleh melihat tanda selepas memuat semula rekod.");
   await detail();
  }
- return <main className={styles.pageShell}><header className={styles.topBar}><Link className={styles.brand} href={dashboardHref}><span className={styles.brandMark}>ES</span><span><strong>EKONOMI SMART</strong><small>PENTAKSIRAN DAN KUIZ</small></span></Link><div className={styles.topActions}><span className={styles.roleBadge}>{roleLabel}</span><Link className={styles.backLink} href={dashboardHref}>Dashboard</Link></div></header>
+ return <main className={styles.pageShell}><header className={styles.topBar}><Link className={styles.brand} href={dashboardHref}><span className={styles.brandMark}><img src="/smk-taman-medan-logo.png" alt="Logo SMK Taman Medan" /></span><span><strong>EKONOMI SMART</strong><small>PENTAKSIRAN DAN KUIZ</small></span></Link><div className={styles.topActions}><span className={styles.roleBadge}>{roleLabel}</span><Link className={styles.backLink} href={dashboardHref}>Dashboard</Link></div><div className="mobile-header-actions"><MobileHeaderMenu roleLabel={roleLabel} items={getMobileMenuItems(roleLabel)} /></div></header>
  <section className={styles.pageContent}><div className={styles.hero}><span className={styles.eyebrow}>PUSAT PENTAKSIRAN DIGITAL</span><h1>Pengurusan latihan dan kuiz</h1><p>Bina soalan objektif dan struktur, terbitkan kuiz serta semak jawapan murid. {roleLabel === "GURU" ? "Senarai skrip dan pemarkahan dihadkan kepada kelas yang dipautkan kepada akaun guru anda." : "Pentadbir boleh melihat dan menyemak semua percubaan murid."}</p></div>{error?<div className={styles.errorBox}>{error}</div>:null}{notice?<div className={styles.noticeBox}>{notice}</div>:null}
  <div className={styles.managerGrid}><section className={styles.panel}><span className={styles.eyebrow}>LANGKAH 1</span><h2>Cipta kuiz</h2><form className={styles.form} onSubmit={createQuiz}>
  <label className={styles.fullWidth}>Tajuk kuiz<input required value={qf.title} onChange={e=>setQf({...qf,title:e.target.value})} placeholder="Contoh: Latihan Bab 1"/></label><label className={styles.fullWidth}>Penerangan<textarea rows={2} value={qf.description} onChange={e=>setQf({...qf,description:e.target.value})}/></label>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import MobileHeaderMenu from "../navigation/mobile-header-menu";
 import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createClient } from "../../../lib/supabase/client";
 import styles from "./quiz.module.css";
@@ -105,6 +106,14 @@ function renderStudentMarkedAnswer(text:string,annotations:MarkAnnotation[]|null
  });
  if(cursor<text.length)nodes.push(<Fragment key={"student-plain-end-"+cursor}>{text.slice(cursor)}</Fragment>);
  return nodes;
+}
+
+function getStudentMobileMenuItems() {
+  return [
+    {label:"Dashboard murid",href:"/murid/dashboard"},
+    {label:"Nota dan bahan pembelajaran",href:"/murid/pembelajaran"},
+    {label:"Latihan dan kuiz",href:"/murid/kuiz"}
+  ];
 }
 
 export default function StudentQuizZone({ formLevel, className }: { formLevel: number; className: string | null }) {
@@ -329,10 +338,11 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
     <main className={styles.pageShell}>
       <header className={styles.topBar}>
         <div className={styles.brand}>
-          <span className={styles.brandMark}>ES</span>
+          <span className={styles.brandMark}><img src="/smk-taman-medan-logo.png" alt="Logo SMK Taman Medan" /></span>
           <span><strong>EKONOMI SMART</strong><small>LATIHAN DAN KUIZ</small></span>
         </div>
         <span className={styles.roleBadge}>TINGKATAN {formLevel}</span>
+        <div className="mobile-header-actions"><MobileHeaderMenu roleLabel="MURID" items={getStudentMobileMenuItems()} /></div>
       </header>
 
       <section className={styles.pageContent}>
