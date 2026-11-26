@@ -495,7 +495,7 @@ html[data-theme="dark"] .mobile-nav { color:#fff !important; border-color:#78b9f
 /* Mobile header: keep only the school identity, role and one compact More menu. */
 .mobile-header-actions{display:none}
 @media(max-width:720px){
- [class*="dashboardHeader"]{position:relative!important;z-index:100!important;width:100%;min-height:68px!important;height:auto!important;box-sizing:border-box;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;padding:8px 3.5%!important;overflow:visible!important}
+ [class*="dashboardHeader"]{position:relative!important;z-index:10010!important;width:100%;min-height:68px!important;height:auto!important;box-sizing:border-box;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;padding:8px 3.5%!important;overflow:visible!important}
  [class*="dashboardHeader"]>[class*="brand"]{display:flex!important;flex:1 1 auto!important;min-width:0!important;max-width:none!important;align-items:center!important;gap:7px!important;overflow:hidden}
  [class*="dashboardHeader"] [class*="brandMark"]{flex:0 0 36px!important;width:36px!important;height:42px!important}
  [class*="dashboardHeader"] [class*="brandText"]{min-width:0!important;flex:1 1 auto!important;overflow:hidden}
@@ -513,7 +513,7 @@ html[data-theme="dark"] .mobile-nav { color:#fff !important; border-color:#78b9f
 
 /* Reuse the same compact role header on quiz and learning workspace pages. */
 @media(max-width:720px){
- [class*="topBar"]{position:relative!important;z-index:100!important;width:100%;min-height:68px!important;height:auto!important;box-sizing:border-box;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;padding:8px 3.5%!important;overflow:visible!important}
+ [class*="topBar"]{position:relative!important;z-index:10010!important;width:100%;min-height:68px!important;height:auto!important;box-sizing:border-box;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;padding:8px 3.5%!important;overflow:visible!important}
  [class*="topBar"]>[class*="brand"]{display:flex!important;flex:1 1 auto!important;min-width:0!important;max-width:none!important;align-items:center!important;gap:7px!important;overflow:hidden}
  [class*="topBar"] [class*="brandMark"]{flex:0 0 36px!important;width:36px!important;height:42px!important}
  [class*="topBar"] [class*="brandText"]{min-width:0!important;flex:1 1 auto!important;overflow:hidden}
