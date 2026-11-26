@@ -230,7 +230,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   setQuizId(data.id);setNotice("Kuiz dicipta sebagai draf di bawah bab silibus yang dipilih.");
   await refresh();
  }
- async function chooseQuestionImage(file:File|null){
+ async async function chooseQuestionImage(file:File|null){
   if(!file)return;
   const allowed=["image/jpeg","image/png","image/webp"];
   if(!allowed.includes(file.type)){
@@ -243,25 +243,43 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    if(imageInputRef.current)imageInputRef.current.value="";
    return;
   }
-  // Read the selected file immediately while the Android document-provider
-  // grant is active. Do not retain a File handle for a later async read.
-  const reader=new FileReader();
-  reader.onload=()=>{
-   const dataUrl=typeof reader.result==="string"?reader.result:"";
-   const comma=dataUrl.indexOf(",");
-   if(comma<0){
-    setError("Fail gambar tidak dapat dibaca. Sila pilih gambar semula.");
-    if(imageInputRef.current)imageInputRef.current.value="";
-    return;
+  setError("");
+  try{
+   // Read the file immediately after selection. Use the File API first,
+   // then fall back to FileReader for browsers/document providers that do
+   // not implement arrayBuffer() reliably (including some Android pickers).
+   let dataUrl="";
+   try{
+    if(typeof file.arrayBuffer==="function"){
+     const buffer=await file.arrayBuffer();
+     const bytes=new Uint8Array(buffer);
+     let binary="";
+     const chunkSize=0x8000;
+     for(let offset=0;offset<bytes.length;offset+=chunkSize){
+      binary+=String.fromCharCode(...bytes.subarray(offset,Math.min(offset+chunkSize,bytes.length)));
+     }
+     dataUrl="data:"+file.type+";base64,"+btoa(binary);
+    }
+   }catch{
+    dataUrl="";
    }
+   if(!dataUrl){
+    dataUrl=await new Promise<string>((resolve,reject)=>{
+     const reader=new FileReader();
+     reader.onload=()=>typeof reader.result==="string"?resolve(reader.result):reject(new Error("Bacaan fail tidak menghasilkan data imej."));
+     reader.onerror=()=>reject(new Error("Pelayar tidak dapat membaca fail yang dipilih."));
+     reader.onabort=()=>reject(new Error("Bacaan fail dibatalkan."));
+     reader.readAsDataURL(file);
+    });
+   }
+   const comma=dataUrl.indexOf(",");
+   if(comma<0)throw new Error("Fail gambar tidak dapat dibaca. Sila pilih gambar semula.");
    setForm(current=>({...current,imageFile:{type:file.type,size:file.size},imageBase64:dataUrl.slice(comma+1),imagePreviewUrl:dataUrl}));
-   setError("");
-  };
-  reader.onerror=()=>{
-   setError("Telefon tidak dapat membaca fail gambar. Cuba pilih gambar daripada Galeri telefon.");
+  }catch(cause){
+   setForm(current=>({...current,imageFile:null,imageBase64:"",imagePreviewUrl:""}));
    if(imageInputRef.current)imageInputRef.current.value="";
-  };
-  reader.readAsDataURL(file);
+   setError(cause instanceof Error?"Gagal membaca gambar: "+cause.message:"Gagal membaca fail gambar. Cuba pilih semula melalui Galeri atau folder komputer.");
+  }
  }
 
  function clearQuestionImage(){
