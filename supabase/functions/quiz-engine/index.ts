@@ -518,7 +518,7 @@ async function getManageableQuiz(
   }
 
   const quizRows = await getRows(supabaseUrl, secretKey, "learning_quizzes", {
-    select: "id,title,created_by,target_form_level,status",
+    select: "id,title,created_by,target_form_level,status,syllabus_chapter_id",
     id: "eq." + quizId,
     limit: "1"
   });
@@ -1100,7 +1100,6 @@ async function createQuizQuestion(
       status: "eq.in_progress",
       limit: "2000"
     });
-    const newMaximum = currentQuestions.reduce((sum, item) => sum, 0) + marks;
     for (const attempt of attempts) {
       await updateRows(supabaseUrl, secretKey, "quiz_attempts", {
         id: "eq." + String(attempt.id),
