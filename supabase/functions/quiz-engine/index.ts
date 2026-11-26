@@ -206,28 +206,11 @@ async function signQuestionImagePaths(
   const quiz = quizzes[0];
   if (!quiz) return { error: "Kuiz tidak ditemui.", status: 404 };
 
-  if (profile.role === "teacher") {
-    let allowed = String(quiz.created_by) === callerId;
-    if (!allowed) {
-      const assignments = await getRows(supabaseUrl, secretKey, "class_teacher_assignments", {
-        select: "class_id",
-        teacher_user_id: "eq." + callerId,
-        limit: "100"
-      });
-      const assignedIds = assignments.map((row) => String(row.class_id));
-      if (assignedIds.length) {
-        const classes = await getRows(supabaseUrl, secretKey, "academic_classes", {
-          select: "id,form_level",
-          id: "in.(" + assignedIds.join(",") + ")",
-          is_active: "eq.true",
-          limit: "100"
-        });
-        allowed = classes.some((row) =>
-          quiz.target_form_level === null || Number(row.form_level) === Number(quiz.target_form_level)
-        );
-      }
+  if (isStaff(profile)) {
+    const access = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
+    if (!access.quiz) {
+      return { error: access.error ?? "Akses imej kuiz ditolak.", status: access.status ?? 403 };
     }
-    if (!allowed) return { error: "Akses imej ditolak. Kuiz ini bukan dalam skop kelas yang ditugaskan kepada anda.", status: 403 };
   } else if (profile.role === "student") {
     const eligibleQuiz = await studentCanTakeQuiz(supabaseUrl, secretKey, quizId, profile);
     if (!eligibleQuiz) {
@@ -239,8 +222,8 @@ async function signQuestionImagePaths(
       });
       if (!attempts.length) return { error: "Anda tidak mempunyai akses kepada gambar kuiz ini.", status: 403 };
     }
-  } else if (profile.role !== "admin") {
-    return { error: "Akses pentadbir diperlukan.", status: 403 };
+  } else {
+    return { error: "Akses imej soalan tidak dibenarkan.", status: 403 };
   }
 
   const questionRows = await getRows(supabaseUrl, secretKey, "quiz_questions", {
