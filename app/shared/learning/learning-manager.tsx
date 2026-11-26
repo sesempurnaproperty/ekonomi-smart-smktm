@@ -301,10 +301,12 @@ export default function LearningManager({ dashboardHref, roleLabel }: ManagerPro
       );
       if (!confirmed) return;
 
-      const { error: deleteError } = await supabase
+      const { data: deletedChapter, error: deleteError } = await supabase
         .from("learning_chapters")
         .delete()
-        .eq("id", chapter.id);
+        .eq("id", chapter.id)
+        .select("id")
+        .maybeSingle();
 
       if (deleteError) {
         const message = deleteError.message.toLowerCase();
@@ -312,6 +314,9 @@ export default function LearningManager({ dashboardHref, roleLabel }: ManagerPro
           throw new Error("Bab ini masih digunakan oleh bahan atau kuiz. Padam atau pindahkan kandungan berkaitan dahulu.");
         }
         throw new Error("Bab gagal dipadam: " + deleteError.message);
+      }
+      if (!deletedChapter) {
+        throw new Error("Bab tidak dipadam. Sila pastikan akaun anda mempunyai akses pentadbir atau guru yang aktif.");
       }
 
       if (materialForm.chapter_id === chapter.id) {
