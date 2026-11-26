@@ -274,12 +274,14 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    if(form.imageFile){
     const extension=form.imageFile.type==="image/jpeg"?"jpg":form.imageFile.type==="image/png"?"png":"webp";
     imagePath=quizId+"/"+crypto.randomUUID()+"."+extension;
-    const {data:signedUpload,error:signError}=await s.storage.from("quiz-question-images").createSignedUploadUrl(imagePath);
-    if(signError||!signedUpload)throw new Error(signError?.message??"Pautan muat naik gambar gagal dijana.");
-    const {error:uploadError}=await s.storage.from("quiz-question-images").uploadToSignedUrl(
-     imagePath,signedUpload.token,form.imageFile,{contentType:form.imageFile.type,cacheControl:"3600"}
+
+    // Use the authenticated Storage upload endpoint. The bucket already has an
+    // INSERT policy scoped to active teachers/admins who own this quiz.
+    // This avoids the extra signed-URL request that was failing on mobile clients.
+    const {error:uploadError}=await s.storage.from("quiz-question-images").upload(
+     imagePath,form.imageFile,{contentType:form.imageFile.type,cacheControl:"3600",upsert:false}
     );
-    if(uploadError)throw new Error(uploadError.message);
+    if(uploadError)throw new Error("Muat naik gambar gagal: "+uploadError.message);
    }
 
    const {data:created,error:createError}=await s.functions.invoke("quiz-engine",{body:{
@@ -294,7 +296,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     correct_option_code:form.kind==="objective"?form.correct:null,
     marking_guide:form.kind==="structured"?form.guide.trim():null
    }});
-   if(createError||created?.error)throw new Error(createError?.message??created?.error??"Soalan gagal disimpan.");
+   if(createError||created?.error)throw new Error("Penyimpanan soalan gagal: "+(createError?.message??created?.error??"Ralat tidak diketahui."));
    createdQuestionId=created.question?.id??null;
 
    setForm({...fresh});
