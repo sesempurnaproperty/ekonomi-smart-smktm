@@ -1002,6 +1002,66 @@ async function submitAttempt(
   };
 }
 
+async function uploadQuizQuestionImage(
+  supabaseUrl: string,
+  secretKey: string,
+  quizId: string,
+  profile: JsonRecord,
+  callerId: string,
+  input: JsonRecord
+) {
+  const access = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
+  if (!access.quiz) return { error: access.error ?? "Akses kuiz ditolak.", status: access.status ?? 403 };
+
+  const mimeType = typeof input.mime_type === "string" ? input.mime_type : "";
+  const extensionByType: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp"
+  };
+  const extension = extensionByType[mimeType];
+  if (!extension) return { error: "Format gambar tidak disokong. Gunakan JPG, PNG atau WebP.", status: 400 };
+
+  const encoded = typeof input.image_base64 === "string" ? input.image_base64 : "";
+  if (!encoded || encoded.length > 7_100_000) {
+    return { error: "Saiz gambar terlalu besar. Had maksimum ialah 5 MB.", status: 413 };
+  }
+
+  let bytes: Uint8Array;
+  try {
+    const binary = atob(encoded);
+    bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  } catch {
+    return { error: "Data gambar tidak sah.", status: 400 };
+  }
+  if (!bytes.length || bytes.length > 5 * 1024 * 1024) {
+    return { error: "Saiz gambar mesti antara 1 bait hingga 5 MB.", status: 413 };
+  }
+
+  const path = quizId + "/" + crypto.randomUUID() + "." + extension;
+  const uploadUrl = new URL(
+    "/storage/v1/object/quiz-question-images/" + path.split("/").map(encodeURIComponent).join("/"),
+    supabaseUrl
+  );
+  const upload = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      apikey: secretKey,
+      Authorization: "Bearer " + secretKey,
+      "Content-Type": mimeType,
+      "x-upsert": "false",
+      "Cache-Control": "3600"
+    },
+    body: bytes
+  });
+  if (!upload.ok) {
+    const detail = await upload.text();
+    throw new Error("Storage gagal menyimpan gambar (" + upload.status + "): " + detail.slice(0, 300));
+  }
+  return { image_path: path };
+}
+
 async function createQuizQuestion(
   supabaseUrl: string,
   secretKey: string,
@@ -1529,6 +1589,9 @@ Deno.serve(async (req: Request) => {
       if (profile.role !== "student") return send({ error: "Tindakan ini khusus untuk murid." }, 403, origin);
       if (typeof body.attempt_id !== "string") return send({ error: "ID percubaan tidak sah." }, 400, origin);
       result = await submitAttempt(supabaseUrl, secretKey, body.attempt_id, callerId, body.answers);
+    } else if (action === "upload_question_image") {
+      if (typeof body.quiz_id !== "string") return send({ error: "ID kuiz tidak sah." }, 400, origin);
+      result = await uploadQuizQuestionImage(supabaseUrl, secretKey, body.quiz_id, profile, callerId, body);
     } else if (action === "create_question") {
       if (typeof body.quiz_id !== "string") return send({ error: "ID kuiz tidak sah." }, 400, origin);
       result = await createQuizQuestion(supabaseUrl, secretKey, body.quiz_id, profile, callerId, body);
