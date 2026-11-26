@@ -109,3 +109,15 @@
   .previewFrame { height: 68vh; }
   .previewFooter { padding: 12px 17px 16px; }
 }
+
+
+/* Chapter maintenance actions */
+.chapterInfo { flex: 1 1 auto; min-width: 0; }
+.chapterActions { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
+.chapterActions button:disabled { opacity: .55; cursor: wait; }
+.chapterActions .dangerButton { min-width: 62px; }
+@media (max-width: 560px) {
+  .chapterRow { align-items: flex-start; gap: 9px; }
+  .chapterActions { flex-direction: column; align-items: stretch; flex: 0 0 92px; }
+  .chapterActions button { width: 100%; min-height: 34px; padding: 7px 6px; font-size: 10px; }
+}
