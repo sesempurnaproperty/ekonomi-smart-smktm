@@ -230,7 +230,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   setQuizId(data.id);setNotice("Kuiz dicipta sebagai draf di bawah bab silibus yang dipilih.");
   await refresh();
  }
- async async function chooseQuestionImage(file:File|null){
+ async function chooseQuestionImage(file:File|null){
   if(!file)return;
   const allowed=["image/jpeg","image/png","image/webp"];
   if(!allowed.includes(file.type)){
