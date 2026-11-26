@@ -348,7 +348,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
 
  async function removeQuestion(question:Question){
   const ok=window.confirm(
-   "PADAM SOALAN "+question.question_order+"?\n\nSoalan ini serta pilihan jawapan dan kunci jawapannya akan dipadam. Kuiz mesti berstatus draf dan semua percubaan murid mesti direset terlebih dahulu. Teruskan?"
+   "PADAM SOALAN "+question.question_order+"?\n\nSoalan ini serta pilihan jawapan dan kunci jawapannya akan dipadam. Kuiz mesti berstatus draf. Semua percubaan murid yang berkaitan perlu direset terlebih dahulu supaya rekod jawapan dan markah tidak terjejas secara senyap. Jika masih ada percubaan, sistem akan memaklumkan sebab sebenar dan jumlah yang masih berbaki. Teruskan?"
   );
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
@@ -356,8 +356,20 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    action:"delete_question",quiz_id:quizId,question_id:question.id
   }});
   setBusy(false);
-  if(err||data?.error){setError(err?.message??data?.error??"Soalan gagal dipadam.");return;}
-  setNotice(data.message??"Soalan berjaya dipadam.");
+  if(err){
+   let message=err.message||"Soalan gagal dipadam.";
+   const context=(err as {context?:unknown}).context;
+   if(context instanceof Response){
+    try{
+     const payload=await context.clone().json() as {error?:unknown};
+     if(typeof payload?.error==="string"&&payload.error.trim())message=payload.error;
+    }catch{}
+   }
+   setError(message);
+   return;
+  }
+  if(data?.error){setError(String(data.error));return;}
+  setNotice(data?.message??"Soalan berjaya dipadam.");
   await detail();
  }
 
