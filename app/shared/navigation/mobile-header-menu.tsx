@@ -15,9 +15,8 @@ export default function MobileHeaderMenu({ roleLabel, items }: MobileHeaderMenuP
     <div className={styles.mobileActions}>
       <span className={styles.roleBadge}>{roleLabel}</span>
       <details className={styles.menu}>
-        <summary aria-label="Buka menu lain" title="Menu lain">
+        <summary aria-label="Buka menu" title="Menu">
           <span className={styles.dots} aria-hidden="true">•••</span>
-          <span className={styles.moreLabel}>MORE</span>
         </summary>
         <nav className={styles.panel} aria-label={`Menu ${roleLabel.toLowerCase()}`}>
           <span className={styles.panelTitle}>MENU UTAMA</span>
