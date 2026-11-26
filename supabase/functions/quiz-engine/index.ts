@@ -525,14 +525,10 @@ async function getManageableQuiz(
   const quiz = quizRows[0];
   if (!quiz) return { error: "Kuiz tidak ditemui.", status: 404 };
 
+  // Administrators and teachers share the same quiz-authoring permissions.
+  // Teachers remain scoped to the form levels of their active class assignments;
+  // quiz creator ownership must not block a teacher from managing shared quizzes.
   if (profile.role === "admin") return { quiz, assignedClassIds: [] };
-
-  if (String(quiz.created_by) !== callerId) {
-    return {
-      error: "Guru hanya boleh memadam atau menetapkan semula kuiz yang dicipta melalui akaun sendiri. Hubungi pentadbir untuk kuiz milik guru lain.",
-      status: 403
-    };
-  }
 
   const assignments = await getRows(supabaseUrl, secretKey, "class_teacher_assignments", {
     select: "class_id",
