@@ -11,6 +11,8 @@ const allowedOrigins = new Set([
   // Current reviewed Vercel Preview deployment and its stable branch alias.
   "https://ekonomi-smart-smktm-k8i0ace2q-cikguikmalproperty-4855.vercel.app",
   "https://ekonomi-smart-smktm-git-fix-mobi-fc0e34-cikguikmalproperty-4855.vercel.app",
+  "https://ekonomi-smart-smktm-git-fix-dele-019622-cikguikmalproperty-4855.vercel.app",
+  "https://ekonomi-smart-smktm-99va0gos7-cikguikmalproperty-4855.vercel.app",
   "http://localhost:3000"
 ]);
 

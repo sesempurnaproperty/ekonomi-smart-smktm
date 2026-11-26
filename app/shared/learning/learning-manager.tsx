@@ -74,6 +74,7 @@ export default function LearningManager({ dashboardHref, roleLabel }: ManagerPro
   const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingChapterId, setDeletingChapterId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [chapterForm, setChapterForm] = useState({ form_level: "4", chapter_number: "1", title: "", description: "" });
@@ -260,6 +261,86 @@ export default function LearningManager({ dashboardHref, roleLabel }: ManagerPro
     }
   }
 
+  async function deleteChapter(chapter: Chapter) {
+    if (deletingChapterId) return;
+
+    // Preview currently uses the shared Production Supabase project. Keep
+    // destructive deletion disabled outside the official Production domain.
+    if (window.location.hostname !== "ekonomi-smart-smktm.vercel.app") {
+      setError("Fungsi padam dinyahaktifkan pada Preview kerana ia menggunakan pangkalan data Production. Pemadaman hanya tersedia pada laman rasmi selepas pelancaran.");
+      setNotice("");
+      return;
+    }
+
+    setDeletingChapterId(chapter.id);
+    setError("");
+    setNotice("");
+
+    try {
+      // Preserve content integrity: a chapter with materials or quizzes must be
+      // cleared or reassigned before its catalogue row can be removed.
+      const [materialCheck, quizCheck] = await Promise.all([
+        supabase.from("learning_materials").select("id", { count: "exact", head: true }).eq("chapter_id", chapter.id),
+        supabase.from("learning_quizzes").select("id", { count: "exact", head: true }).eq("chapter_id", chapter.id)
+      ]);
+
+      if (materialCheck.error) throw new Error("Bahan yang berkaitan dengan bab gagal disemak: " + materialCheck.error.message);
+      if (quizCheck.error) throw new Error("Kuiz yang berkaitan dengan bab gagal disemak: " + quizCheck.error.message);
+
+      const materialCount = materialCheck.count ?? 0;
+      const quizCount = quizCheck.count ?? 0;
+
+      if (materialCount > 0 || quizCount > 0) {
+        const reasons = [
+          materialCount > 0 ? materialCount + " bahan pembelajaran" : "",
+          quizCount > 0 ? quizCount + " kuiz" : ""
+        ].filter(Boolean).join(" dan ");
+        setError(
+          "Bab Tingkatan " + chapter.form_level + " · Bab " + chapter.chapter_number +
+          " tidak boleh dipadam kerana masih mempunyai " + reasons +
+          ". Padam atau pindahkan kandungan tersebut dahulu. Bab dan kandungannya kekal selamat."
+        );
+        return;
+      }
+
+      const confirmed = window.confirm(
+        "Padam bab Tingkatan " + chapter.form_level + " · Bab " + chapter.chapter_number +
+        ": " + chapter.title + "?\n\nTindakan ini tidak boleh dibatalkan."
+      );
+      if (!confirmed) return;
+
+      const { data: deletedChapter, error: deleteError } = await supabase
+        .from("learning_chapters")
+        .delete()
+        .eq("id", chapter.id)
+        .select("id")
+        .maybeSingle();
+
+      if (deleteError) {
+        const message = deleteError.message.toLowerCase();
+        if (message.includes("foreign key") || message.includes("violates")) {
+          throw new Error("Bab ini masih digunakan oleh bahan atau kuiz. Padam atau pindahkan kandungan berkaitan dahulu.");
+        }
+        throw new Error("Bab gagal dipadam: " + deleteError.message);
+      }
+      if (!deletedChapter) {
+        throw new Error("Bab tidak dipadam. Sila pastikan akaun anda mempunyai akses pentadbir atau guru yang aktif.");
+      }
+
+      if (materialForm.chapter_id === chapter.id) {
+        const nextChapterId = chapters.find((item) => item.id !== chapter.id && item.is_active)?.id ?? "";
+        setMaterialForm((current) => ({ ...current, chapter_id: nextChapterId }));
+      }
+
+      setNotice("Bab Tingkatan " + chapter.form_level + " · Bab " + chapter.chapter_number + " berjaya dipadam.");
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Bab gagal dipadam. Sila cuba lagi.");
+    } finally {
+      setDeletingChapterId(null);
+    }
+  }
+
   async function togglePublished(material: Material) {
     setError("");
     const { error: updateError } = await supabase.from("learning_materials")
@@ -391,8 +472,11 @@ export default function LearningManager({ dashboardHref, roleLabel }: ManagerPro
               <h3>Senarai bab berdaftar</h3>
               {chapters.length === 0 ? <p className={styles.emptyText}>Belum ada bab. Daftarkan bab terlebih dahulu.</p> : chapters.map((chapter) => (
                 <div className={styles.chapterRow} key={chapter.id}>
-                  <div><strong>T{chapter.form_level} · Bab {chapter.chapter_number}: {chapter.title}</strong><small>{chapter.description || "Tiada penerangan"} · {chapter.is_active ? "Aktif" : "Tidak aktif"}</small></div>
-                  <button type="button" className={styles.smallButton} onClick={() => void toggleChapter(chapter)}>{chapter.is_active ? "Nyahaktif" : "Aktifkan"}</button>
+                  <div className={styles.chapterInfo}><strong>T{chapter.form_level} · Bab {chapter.chapter_number}: {chapter.title}</strong><small>{chapter.description || "Tiada penerangan"} · {chapter.is_active ? "Aktif" : "Tidak aktif"}</small></div>
+                  <div className={styles.chapterActions}>
+                    <button type="button" className={styles.smallButton} onClick={() => void toggleChapter(chapter)} disabled={Boolean(deletingChapterId)}>{chapter.is_active ? "Nyahaktif" : "Aktifkan"}</button>
+                    <button type="button" className={styles.dangerButton} onClick={() => void deleteChapter(chapter)} disabled={Boolean(deletingChapterId)}>{deletingChapterId === chapter.id ? "Memadam..." : "Padam"}</button>
+                  </div>
                 </div>
               ))}
             </div>
