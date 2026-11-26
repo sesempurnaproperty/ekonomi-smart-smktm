@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import MobileHeaderMenu from "../navigation/mobile-header-menu";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "../../../lib/supabase/client";
 import styles from "./learning.module.css";
@@ -42,6 +43,28 @@ const emptyMaterial = {
 
 function safeFileName(value: string) {
   return value.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").slice(-90);
+}
+
+function getMobileMenuItems(roleLabel: string) {
+  if (roleLabel === "PENTADBIR") return [
+    {label:"Dashboard pentadbir",href:"/admin/dashboard"},
+    {label:"Pengurusan pengguna",href:"/admin/pengguna"},
+    {label:"Pengurusan kelas",href:"/admin/kelas"},
+    {label:"Rekod markah",href:"/admin/markah"},
+    {label:"Analitik pencapaian",href:"/admin/analitik"},
+    {label:"Bahan pembelajaran",href:"/admin/pembelajaran"},
+    {label:"Pentaksiran dan kuiz",href:"/admin/kuiz"}
+  ];
+  if (roleLabel === "GURU") return [
+    {label:"Dashboard guru",href:"/guru/dashboard"},
+    {label:"Bahan pembelajaran",href:"/guru/pembelajaran"},
+    {label:"Pentaksiran dan kuiz",href:"/guru/kuiz"}
+  ];
+  return [
+    {label:"Dashboard murid",href:"/murid/dashboard"},
+    {label:"Nota dan bahan pembelajaran",href:"/murid/pembelajaran"},
+    {label:"Latihan dan kuiz",href:"/murid/kuiz"}
+  ];
 }
 
 export default function LearningManager({ dashboardHref, roleLabel }: ManagerProps) {
@@ -315,13 +338,14 @@ export default function LearningManager({ dashboardHref, roleLabel }: ManagerPro
     <main className={styles.pageShell}>
       <header className={styles.topBar}>
         <Link className={styles.brand} href={dashboardHref}>
-          <span className={styles.brandMark}>ES</span>
+          <span className={styles.brandMark}><img src="/smk-taman-medan-logo.png" alt="Logo SMK Taman Medan" /></span>
           <span><strong>EKONOMI SMART</strong><small>PERPUSTAKAAN BAHAN PEMBELAJARAN</small></span>
         </Link>
         <div className={styles.topActions}>
           <span className={styles.roleBadge}>{roleLabel}</span>
           <Link className={styles.backLink} href={dashboardHref}>Dashboard</Link>
         </div>
+        <div className="mobile-header-actions"><MobileHeaderMenu roleLabel={roleLabel} items={getMobileMenuItems(roleLabel)} /></div>
       </header>
 
       <section className={styles.pageContent}>
