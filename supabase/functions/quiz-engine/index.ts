@@ -1093,19 +1093,7 @@ async function createQuizQuestion(
       updated_at: new Date().toISOString()
     }], "question_id");
 
-    // Recalculate the maximum for attempts still in progress. Existing submitted results remain untouched.
-    const attempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
-      select: "id,max_score",
-      quiz_id: "eq." + quizId,
-      status: "eq.in_progress",
-      limit: "2000"
-    });
-    for (const attempt of attempts) {
-      await updateRows(supabaseUrl, secretKey, "quiz_attempts", {
-        id: "eq." + String(attempt.id),
-        status: "eq.in_progress"
-      }, { max_score: asNumber(attempt.max_score) + marks });
-    }
+    // Existing attempts retain their saved state; submitAttempt recalculates the current maximum.
 
     return { question, message: "Soalan berjaya ditambah." };
   } catch (error) {
