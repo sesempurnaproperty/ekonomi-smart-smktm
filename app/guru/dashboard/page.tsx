@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getCurrentProfile } from "../../../lib/auth/get-current-profile";
 import styles from "../guru.module.css";
 import TeacherLogoutButton from "./logout-button";
+import MobileHeaderMenu from "../../shared/navigation/mobile-header-menu";
 
 export const metadata: Metadata = {
   title: "Dashboard Guru | Ekonomi Smart SMKTM",
@@ -29,6 +30,7 @@ export default async function TeacherDashboardPage() {
           <span className={styles.brandText}><strong>EKONOMI<span>SMART</span></strong><small>PORTAL GURU · SMK TAMAN MEDAN</small></span>
         </Link>
         <div className={styles.dashboardActions}><span className={styles.teacherBadge}>AKSES GURU</span><TeacherLogoutButton /></div>
+      <div className="mobile-header-actions"><MobileHeaderMenu roleLabel="GURU" items={[{label:"Dashboard guru",href:"/guru/dashboard"},{label:"Bahan pembelajaran",href:"/guru/pembelajaran"},{label:"Pentaksiran dan kuiz",href:"/guru/kuiz"}]} /></div>
       </header>
       <section className={styles.dashboardMain}>
         <span className={styles.dashboardKicker}>PUSAT PENGURUSAN PEMBELAJARAN</span>
