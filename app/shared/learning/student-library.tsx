@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import MobileHeaderMenu from "../navigation/mobile-header-menu";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "../../../lib/supabase/client";
 import styles from "./learning.module.css";
@@ -25,6 +26,14 @@ type Material = {
   created_at: string;
 };
 type StudentLibraryProps = { formLevel: number | null; className: string | null };
+
+function getStudentMobileMenuItems() {
+  return [
+    {label:"Dashboard murid",href:"/murid/dashboard"},
+    {label:"Nota dan bahan pembelajaran",href:"/murid/pembelajaran"},
+    {label:"Latihan dan kuiz",href:"/murid/kuiz"}
+  ];
+}
 
 export default function StudentLearningLibrary({ formLevel, className }: StudentLibraryProps) {
   const supabase = useMemo(() => createClient(), []);
@@ -103,13 +112,14 @@ export default function StudentLearningLibrary({ formLevel, className }: Student
     <main className={styles.pageShell}>
       <header className={styles.topBar}>
         <Link className={styles.brand} href="/murid/dashboard">
-          <span className={styles.brandMark}>ES</span>
+          <span className={styles.brandMark}><img src="/smk-taman-medan-logo.png" alt="Logo SMK Taman Medan" /></span>
           <span><strong>EKONOMI SMART</strong><small>PERPUSTAKAAN BAHAN PEMBELAJARAN</small></span>
         </Link>
         <div className={styles.topActions}>
           <span className={styles.roleBadge}>AKSES TINGKATAN 4 &amp; 5</span>
           <Link className={styles.backLink} href="/murid/dashboard">Dashboard</Link>
         </div>
+        <div className="mobile-header-actions"><MobileHeaderMenu roleLabel="MURID" items={getStudentMobileMenuItems()} /></div>
       </header>
 
       <section className={styles.pageContent}>
