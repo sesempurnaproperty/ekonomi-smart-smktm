@@ -20,11 +20,11 @@ const allowedOrigins = new Set([
 // Keep the exact Vercel project prefix and owner suffix to avoid broad wildcard CORS.
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return true;
-  if (isAllowedOrigin(origin)) return true;
+  if (allowedOrigins.has(origin)) return true;
   try {
     const url = new URL(origin);
     return url.protocol === "https:" &&
-      /^ekonomi-smart-smktm-[a-z0-9-]+-cikguikmalproperty-4855\\.vercel\\.app$/.test(url.hostname);
+      /^ekonomi-smart-smktm-[a-z0-9-]+-cikguikmalproperty-4855\.vercel\.app$/.test(url.hostname);
   } catch {
     return false;
   }
