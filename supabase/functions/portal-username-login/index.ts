@@ -8,13 +8,27 @@ const corsHeaders = {
 const allowedOrigins = new Set([
   "https://ekonomi-smart-smktm.vercel.app",
   "https://ekonomi-smart-smktm-cikguikmalproperty-4855.vercel.app",
-  // Current reviewed Vercel Preview deployment and its stable branch alias.
+  // Previously reviewed Vercel Preview deployments.
   "https://ekonomi-smart-smktm-k8i0ace2q-cikguikmalproperty-4855.vercel.app",
   "https://ekonomi-smart-smktm-git-fix-mobi-fc0e34-cikguikmalproperty-4855.vercel.app",
   "https://ekonomi-smart-smktm-git-fix-dele-019622-cikguikmalproperty-4855.vercel.app",
   "https://ekonomi-smart-smktm-99va0gos7-cikguikmalproperty-4855.vercel.app",
   "http://localhost:3000"
 ]);
+
+// Allow this project's deployment-specific and branch-specific Preview URLs.
+// Keep the exact Vercel project prefix and owner suffix to avoid broad wildcard CORS.
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return true;
+  if (isAllowedOrigin(origin)) return true;
+  try {
+    const url = new URL(origin);
+    return url.protocol === "https:" &&
+      /^ekonomi-smart-smktm-[a-z0-9-]+-cikguikmalproperty-4855\\.vercel\\.app$/.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
 
 function jsonResponse(
   body: Record<string, unknown>,
@@ -25,7 +39,7 @@ function jsonResponse(
     status,
     headers: {
       ...corsHeaders,
-      "Access-Control-Allow-Origin": origin ? (allowedOrigins.has(origin) ? origin : "null") : "*",
+      "Access-Control-Allow-Origin": origin ? (isAllowedOrigin(origin) ? origin : "null") : "*",
       "Content-Type": "application/json",
       "Cache-Control": "no-store"
     }
@@ -48,7 +62,7 @@ Deno.serve(async (request: Request) => {
   const origin = request.headers.get("origin");
 
   if (request.method === "OPTIONS") {
-    if (origin && !allowedOrigins.has(origin)) {
+    if (origin && !isAllowedOrigin(origin)) {
       return jsonResponse({ error: "Origin tidak dibenarkan." }, 403, origin);
     }
     return new Response("ok", {
@@ -59,7 +73,7 @@ Deno.serve(async (request: Request) => {
     });
   }
 
-  if (origin && !allowedOrigins.has(origin)) {
+  if (origin && !isAllowedOrigin(origin)) {
     return jsonResponse({ error: "Origin tidak dibenarkan." }, 403, origin);
   }
 
