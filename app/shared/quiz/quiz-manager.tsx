@@ -4,6 +4,15 @@ import MobileHeaderMenu from "../navigation/mobile-header-menu";
 import {Fragment,FormEvent,useCallback,useEffect,useMemo,useRef,useState,type ReactNode} from "react";
 import {createClient} from "../../../lib/supabase/client";
 import styles from "./quiz.module.css";
+async function fileToBase64(file:File):Promise<string>{
+ const bytes=new Uint8Array(await file.arrayBuffer());
+ let binary="";
+ const chunkSize=0x8000;
+ for(let offset=0;offset<bytes.length;offset+=chunkSize){
+  binary+=String.fromCharCode(...bytes.subarray(offset,Math.min(offset+chunkSize,bytes.length)));
+ }
+ return btoa(binary);
+}
 type Quiz={id:string;title:string;description:string|null;target_form_level:number|null;chapter_id:string|null;syllabus_chapter_id:string;attempt_limit:number;status:string};
 type Chapter={id:string;form_level:number;chapter_number:number;title:string};
 type SyllabusChapter={id:string;chapter_number:number;title:string;display_order:number};
@@ -272,16 +281,17 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   let createdQuestionId:string|null=null;
   try{
    if(form.imageFile){
-    const extension=form.imageFile.type==="image/jpeg"?"jpg":form.imageFile.type==="image/png"?"png":"webp";
-    imagePath=quizId+"/"+crypto.randomUUID()+"."+extension;
-
-    // Use the authenticated Storage upload endpoint. The bucket already has an
-    // INSERT policy scoped to active teachers/admins who own this quiz.
-    // This avoids the extra signed-URL request that was failing on mobile clients.
-    const {error:uploadError}=await s.storage.from("quiz-question-images").upload(
-     imagePath,form.imageFile,{contentType:form.imageFile.type,cacheControl:"3600",upsert:false}
-    );
-    if(uploadError)throw new Error("Muat naik gambar gagal: "+uploadError.message);
+    if(form.imageFile.size>4*1024*1024)throw new Error("Saiz gambar maksimum ialah 4 MB. Sila kecilkan gambar dan cuba semula.");
+    const imageBase64=await fileToBase64(form.imageFile);
+    const {data:uploaded,error:uploadError}=await s.functions.invoke("quiz-engine",{body:{
+     action:"upload_question_image",
+     quiz_id:quizId,
+     mime_type:form.imageFile.type,
+     image_base64:imageBase64
+    }});
+    if(uploadError||uploaded?.error)throw new Error("Muat naik gambar gagal: "+(uploadError?.message??uploaded?.error??"Ralat tidak diketahui."));
+    if(typeof uploaded?.image_path!=="string"||!uploaded.image_path.startsWith(quizId+"/"))throw new Error("Pelayan tidak memulangkan laluan gambar yang sah.");
+    imagePath=uploaded.image_path;
    }
 
    const {data:created,error:createError}=await s.functions.invoke("quiz-engine",{body:{
