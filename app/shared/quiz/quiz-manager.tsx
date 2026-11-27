@@ -12,7 +12,7 @@ type Question={id:string;quiz_id:string;question_order:number;question_type:"obj
 type Option={id:string;question_id:string;option_code:string;option_text:string;option_order:number};
 type MarkType="right"|"wrong"|"tr"|"repeat";
 type MarkAnnotation={id:string;start:number;end:number;text:string;type:MarkType;comment?:string};
-type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;auto_score:number|null;teacher_score:number|null;feedback:string|null;marking_annotations?:MarkAnnotation[]|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null;image_path:string|null;image_url?:string|null;syllabus_topic_id:string}|null};
+type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;auto_score:number|null;teacher_score:number|null;feedback:string|null;marking_annotations?:MarkAnnotation[]|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null;image_path:string|null;image_paths?:string[];image_url?:string|null;image_urls?:string[];syllabus_topic_id:string}|null};
 const MARK_TYPES:{type:MarkType;symbol:string;label:string}[]=[
  {type:"right",symbol:"✓",label:"Mengandungi markah"},
  {type:"wrong",symbol:"✗",label:"Jawapan salah"},
