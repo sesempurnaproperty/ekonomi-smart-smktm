@@ -206,10 +206,11 @@ async function signQuestionImagePaths(
   const quiz = quizzes[0];
   if (!quiz) return { error: "Kuiz tidak ditemui.", status: 404 };
 
+  let staffAccess: { assignedClassIds?: string[]; error?: string; status?: number; quiz?: JsonRecord } | null = null;
   if (isStaff(profile)) {
-    const access = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
-    if (!access.quiz) {
-      return { error: access.error ?? "Akses imej kuiz ditolak.", status: access.status ?? 403 };
+    staffAccess = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
+    if (!staffAccess.quiz) {
+      return { error: staffAccess.error ?? "Akses imej kuiz ditolak.", status: staffAccess.status ?? 403 };
     }
   } else if (profile.role === "student") {
     const eligibleQuiz = await studentCanTakeQuiz(supabaseUrl, secretKey, quizId, profile);
@@ -248,7 +249,7 @@ async function signQuestionImagePaths(
     });
     let permittedStudentIds = new Set(attempts.map((attempt) => String(attempt.student_id)));
     if (profile.role === "teacher") {
-      const assignedClassIds = new Set(access?.assignedClassIds ?? []);
+      const assignedClassIds = new Set(staffAccess?.assignedClassIds ?? []);
       const studentIds = [...permittedStudentIds];
       const students = studentIds.length ? await getRows(supabaseUrl, secretKey, "user_profiles", {
         select: "user_id,academic_class_id,role",
