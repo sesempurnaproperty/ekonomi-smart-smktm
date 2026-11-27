@@ -417,7 +417,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
 
  async function removeQuestion(question:Question){
   const ok=window.confirm(
-   `PADAM SOALAN ${question.question_order}?\n\nSoalan ini serta pilihan jawapan dan kunci jawapannya akan dipadam. Kuiz mesti berstatus draf. Semua percubaan murid yang berkaitan perlu direset terlebih dahulu supaya rekod jawapan dan markah tidak terjejas secara senyap. Jika masih ada percubaan, sistem akan memaklumkan sebab sebenar dan jumlah yang masih berbaki. Teruskan?`\n  );
+   `PADAM SOALAN ${question.question_order}?\n\nSoalan ini serta pilihan jawapan dan kunci jawapannya akan dipadam. Kuiz mesti berstatus draf. Semua percubaan murid yang berkaitan perlu direset terlebih dahulu supaya rekod jawapan dan markah tidak terjejas secara senyap. Jika masih ada percubaan, sistem akan memaklumkan sebab sebenar dan jumlah yang masih berbaki. Teruskan?`
+  );
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{
