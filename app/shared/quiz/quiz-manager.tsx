@@ -8,11 +8,11 @@ type Quiz={id:string;title:string;description:string|null;target_form_level:numb
 type Chapter={id:string;form_level:number;chapter_number:number;title:string};
 type SyllabusChapter={id:string;chapter_number:number;title:string;display_order:number};
 type SyllabusTopic={id:string;chapter_id:string;topic_code:string;title:string;display_order:number};
-type Question={id:string;quiz_id:string;question_order:number;question_type:"objective"|"structured";prompt:string;marks:number;image_path:string|null;image_paths?:string[];image_url?:string|null;image_urls?:string[];syllabus_topic_id:string};
+type Question={id:string;quiz_id:string;question_order:number;question_type:"objective"|"structured";prompt:string;marks:number;image_path:string|null;image_paths?:string[];image_url?:string|null;image_urls?:string[];marking_guide_image_paths?:string[];marking_guide_image_urls?:string[];syllabus_topic_id:string};
 type Option={id:string;question_id:string;option_code:string;option_text:string;option_order:number};
 type MarkType="right"|"wrong"|"tr"|"repeat";
 type MarkAnnotation={id:string;start:number;end:number;text:string;type:MarkType;comment?:string};
-type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;answer_image_paths?:string[];answer_image_urls?:string[];auto_score:number|null;teacher_score:number|null;feedback:string|null;marking_annotations?:MarkAnnotation[]|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null;image_path:string|null;image_paths?:string[];image_url?:string|null;image_urls?:string[];syllabus_topic_id:string}|null};
+type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;answer_image_paths?:string[];answer_image_urls?:string[];auto_score:number|null;teacher_score:number|null;feedback:string|null;marking_annotations?:MarkAnnotation[]|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null;image_path:string|null;image_paths?:string[];image_url?:string|null;image_urls?:string[];marking_guide_image_paths?:string[];marking_guide_image_urls?:string[];syllabus_topic_id:string}|null};
 const MARK_TYPES:{type:MarkType;symbol:string;label:string}[]=[
  {type:"right",symbol:"✓",label:"Mengandungi markah"},
  {type:"wrong",symbol:"✗",label:"Jawapan salah"},
