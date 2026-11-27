@@ -197,8 +197,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     total.questions+=1;
     totals.set(topicId,total);
    });
-  });
-  return syllabusTopics.map(topic=>{
+  });  return syllabusTopics.map(topic=>{
    const total=totals.get(topic.id);
    const maximum=total?.maximum??0;
    const earned=total?.earned??0;
@@ -357,9 +356,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   if(!selected)return;
   const scopeText=roleLabel==="GURU"?"percubaan murid daripada kelas yang ditugaskan kepada akaun anda":"semua percubaan murid";
   const ok=window.confirm(
-   "RESET PERCOBAAN KUIZ?
-
-Tindakan ini akan memadam "+scopeText+", termasuk jawapan, markah dan ulasan guru. Kuiz akan ditarik balik dan perlu diterbitkan semula. Tindakan ini tidak boleh dibatalkan. Teruskan?"
+   "RESET PERCOBAAN KUIZ?\n\nTindakan ini akan memadam "+scopeText+", termasuk jawapan, markah dan ulasan guru. Kuiz akan ditarik balik dan perlu diterbitkan semula. Tindakan ini tidak boleh dibatalkan. Teruskan?"
   );
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
@@ -397,8 +394,7 @@ Soalan ini serta pilihan jawapan dan kunci jawapannya akan dipadam. Kuiz mesti b
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{
-   action:"delete_question",quiz_id:quizId,question_id:question.id
-  }});
+   action:"delete_question",quiz_id:quizId,question_id:question.id  }});
   setBusy(false);
   if(err){
    let message=err.message||"Soalan gagal dipadam.";
