@@ -387,8 +387,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    "RESET PERCOBAAN KUIZ?",
    "",
    "Tindakan ini akan memadam "+scopeText+", termasuk jawapan, markah dan ulasan guru. Kuiz akan ditarik balik dan perlu diterbitkan semula. Tindakan ini tidak boleh dibatalkan. Teruskan?"
-  ].join("
-"));
+  ].join("\n"));
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"reset_quiz_attempts",quiz_id:selected.id}});
@@ -405,8 +404,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    "PADAM KESELURUHAN KUIZ?",
    "",
    "Kuiz '"+selected.title+"' akan dipadam bersama semua soalan, pilihan jawapan, kunci jawapan, jawapan murid, markah dan sejarah percubaan yang berkaitan. Tindakan ini kekal dan tidak boleh dibatalkan. Teruskan?"
-  ].join("
-"));
+  ].join("\n"));
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"delete_quiz",quiz_id:selected.id}});
