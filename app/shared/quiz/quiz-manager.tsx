@@ -355,9 +355,11 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  async function resetAttempts(){
   if(!selected)return;
   const scopeText=roleLabel==="GURU"?"percubaan murid daripada kelas yang ditugaskan kepada akaun anda":"semua percubaan murid";
-  const ok=window.confirm(
-   "RESET PERCOBAAN KUIZ?\n\nTindakan ini akan memadam "+scopeText+", termasuk jawapan, markah dan ulasan guru. Kuiz akan ditarik balik dan perlu diterbitkan semula. Tindakan ini tidak boleh dibatalkan. Teruskan?"
-  );
+  const ok=window.confirm([
+   "RESET PERCOBAAN KUIZ?",
+   "",
+   "Tindakan ini akan memadam "+scopeText+", termasuk jawapan, markah dan ulasan guru. Kuiz akan ditarik balik dan perlu diterbitkan semula. Tindakan ini tidak boleh dibatalkan. Teruskan?"
+  ].join("\n"));
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"reset_quiz_attempts",quiz_id:selected.id}});
@@ -370,9 +372,11 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
 
  async function removeQuiz(){
   if(!selected)return;
-  const ok=window.confirm(
-   "PADAM KESELURUHAN KUIZ?\n\nKuiz '"+selected.title+"' akan dipadam bersama semua soalan, pilihan jawapan, kunci jawapan, jawapan murid, markah dan sejarah percubaan yang berkaitan. Tindakan ini kekal dan tidak boleh dibatalkan. Teruskan?"
-  );
+  const ok=window.confirm([
+   "PADAM KESELURUHAN KUIZ?",
+   "",
+   "Kuiz '"+selected.title+"' akan dipadam bersama semua soalan, pilihan jawapan, kunci jawapan, jawapan murid, markah dan sejarah percubaan yang berkaitan. Tindakan ini kekal dan tidak boleh dibatalkan. Teruskan?"
+  ].join("\n"));
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"delete_quiz",quiz_id:selected.id}});
