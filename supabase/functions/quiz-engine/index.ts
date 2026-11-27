@@ -810,7 +810,7 @@ async function startAttempt(
   }
 
   const draftResponses = await getRows(supabaseUrl, secretKey, "quiz_responses", {
-    select: "question_id,selected_option_id,response_text",
+    select: "question_id,selected_option_id,response_text,answer_image_paths",
     attempt_id: "eq." + String(attempt.id),
     limit: "500"
   });
@@ -839,7 +839,8 @@ async function saveDraftResponse(
   questionId: string,
   userId: string,
   selectedOptionId: string | null,
-  responseText: string | null
+  responseText: string | null,
+  answerImagePathsValue: unknown = []
 ) {
   const attempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
     select: "id,quiz_id,status",
@@ -860,6 +861,9 @@ async function saveDraftResponse(
   const question = questions[0];
   if (!question) return { error: "Soalan tidak sepadan dengan percubaan ini.", status: 400 };
 
+  const answerImagePaths = Array.isArray(answerImagePathsValue) ? [...new Set(answerImagePathsValue.filter((path): path is string => typeof path === "string" && path.startsWith(String(attempt.quiz_id) + "/answers/")))] : [];
+  if (answerImagePaths.length > 4) return { error: "Maksimum empat gambar jawapan dibenarkan.", status: 400 };
+  if (question.question_type === "objective" && answerImagePaths.length) return { error: "Gambar jawapan hanya dibenarkan untuk soalan struktur.", status: 400 };
   if (question.question_type === "objective") {
     if (selectedOptionId) {
       const options = await getRows(supabaseUrl, secretKey, "quiz_options", {
@@ -881,6 +885,7 @@ async function saveDraftResponse(
     question_id: questionId,
     selected_option_id: selectedOptionId,
     response_text: responseText,
+    answer_image_paths: answerImagePaths,
     auto_score: null,
     teacher_score: null
   }], "attempt_id,question_id");
@@ -944,11 +949,14 @@ async function submitAttempt(
     } else {
       structuredCount += 1;
       const responseText = typeof answer.response_text === "string" ? answer.response_text.trim().slice(0, 12000) : "";
+      const answerImagePaths = Array.isArray(answer.answer_image_paths) ? [...new Set(answer.answer_image_paths.filter((path): path is string => typeof path === "string" && path.startsWith(String(attempt.quiz_id) + "/answers/")))] : [];
+      if (answerImagePaths.length > 4) return { error: "Maksimum empat gambar jawapan dibenarkan.", status: 400 };
       responses.push({
         attempt_id: attemptId,
         question_id: qid,
         selected_option_id: null,
         response_text: responseText,
+        answer_image_paths: answerImagePaths,
         auto_score: null,
         teacher_score: null
       });
@@ -1569,7 +1577,8 @@ Deno.serve(async (req: Request) => {
       result = await saveDraftResponse(
         supabaseUrl, secretKey, body.attempt_id, body.question_id, callerId,
         typeof body.selected_option_id === "string" ? body.selected_option_id : null,
-        typeof body.response_text === "string" ? body.response_text : null
+        typeof body.response_text === "string" ? body.response_text : null,
+        body.answer_image_paths
       );
     } else if (action === "submit_attempt") {
       if (profile.role !== "student") return send({ error: "Tindakan ini khusus untuk murid." }, 403, origin);
@@ -1659,18 +1668,18 @@ Deno.serve(async (req: Request) => {
       }
       const attemptIds = visibleAttemptRows.map((a) => String(a.id));
       const responseRows = attemptIds.length ? await getRows(supabaseUrl, secretKey, "quiz_responses", {
-        select: "id,attempt_id,question_id,selected_option_id,response_text,auto_score,teacher_score,feedback,marking_annotations",
+        select: "id,attempt_id,question_id,selected_option_id,response_text,answer_image_paths,auto_score,teacher_score,feedback,marking_annotations",
         attempt_id: "in.(" + attemptIds.join(",") + ")",
         limit: "2000"
       }) : [];
       const questionIds = [...new Set(responseRows.map((r) => String(r.question_id)))];
       const questionRows = questionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_questions", {
-        select: "id,question_type,prompt,marks,question_order,image_path,syllabus_topic_id",
+        select: "id,question_type,prompt,marks,question_order,image_path,image_paths,syllabus_topic_id",
         id: "in.(" + questionIds.join(",") + ")",
         limit: "1000"
       }) : [];
       const answerKeyRows = questionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_answer_keys", {
-        select: "question_id,marking_guide",
+        select: "question_id,marking_guide,marking_guide_image_paths",
         question_id: "in.(" + questionIds.join(",") + ")",
         limit: "1000"
       }) : [];
@@ -1683,7 +1692,8 @@ Deno.serve(async (req: Request) => {
       }) : [];
       const questionMap = new Map(questionRows.map((q) => [String(q.id), {
         ...q,
-        marking_guide: guideMap.get(String(q.id)) ?? null
+        marking_guide: guideMap.get(String(q.id)) ?? null,
+        marking_guide_image_paths: answerKeyRows.find((row) => String(row.question_id) === String(q.id))?.marking_guide_image_paths ?? []
       }]));
       const optionMap = new Map(optionRows.map((o) => [String(o.id), o]));
       result = {
