@@ -240,6 +240,57 @@ async function signQuestionImagePaths(
     const questionIds = questionRows.map((row) => String(row.id));
     const guideRows = questionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_answer_keys", { select: "marking_guide_image_paths", question_id: "in.(" + questionIds.join(",") + ")", limit: "500" }) : [];
     guideRows.forEach((row) => { if (Array.isArray(row.marking_guide_image_paths)) row.marking_guide_image_paths.forEach((path) => { if (typeof path === "string") allowedPaths.add(path); }); });
+
+    const attempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
+      select: "id,student_id",
+      quiz_id: "eq." + quizId,
+      limit: "2000"
+    });
+    let permittedStudentIds = new Set(attempts.map((attempt) => String(attempt.student_id)));
+    if (profile.role === "teacher") {
+      const assignedClassIds = new Set(access.assignedClassIds ?? []);
+      const studentIds = [...permittedStudentIds];
+      const students = studentIds.length ? await getRows(supabaseUrl, secretKey, "user_profiles", {
+        select: "user_id,academic_class_id,role",
+        user_id: "in.(" + studentIds.join(",") + ")",
+        limit: "2000"
+      }) : [];
+      permittedStudentIds = new Set(students.filter((student) =>
+        student.role === "student" && assignedClassIds.has(String(student.academic_class_id))
+      ).map((student) => String(student.user_id)));
+    }
+    const permittedAttempts = attempts.filter((attempt) => permittedStudentIds.has(String(attempt.student_id)));
+    const attemptIds = permittedAttempts.map((attempt) => String(attempt.id));
+    const answerRows = attemptIds.length ? await getRows(supabaseUrl, secretKey, "quiz_responses", {
+      select: "answer_image_paths",
+      attempt_id: "in.(" + attemptIds.join(",") + ")",
+      question_id: "in.(" + questionIds.join(",") + ")",
+      limit: "5000"
+    }) : [];
+    answerRows.forEach((row) => {
+      if (Array.isArray(row.answer_image_paths)) row.answer_image_paths.forEach((path) => {
+        if (typeof path === "string") allowedPaths.add(path);
+      });
+    });
+  } else if (profile.role === "student") {
+    const ownAttempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
+      select: "id",
+      quiz_id: "eq." + quizId,
+      student_id: "eq." + callerId,
+      limit: "100"
+    });
+    const ownAttemptIds = ownAttempts.map((attempt) => String(attempt.id));
+    const ownResponses = ownAttemptIds.length ? await getRows(supabaseUrl, secretKey, "quiz_responses", {
+      select: "answer_image_paths",
+      attempt_id: "in.(" + ownAttemptIds.join(",") + ")",
+      question_id: "in.(" + questionRows.map((row) => String(row.id)).join(",") + ")",
+      limit: "500"
+    }) : [];
+    ownResponses.forEach((row) => {
+      if (Array.isArray(row.answer_image_paths)) row.answer_image_paths.forEach((path) => {
+        if (typeof path === "string") allowedPaths.add(path);
+      });
+    });
   }
   if (paths.some((path) => !allowedPaths.has(path))) {
     return { error: "Satu atau lebih imej tidak dipautkan kepada kuiz atau tidak dibenarkan.", status: 403 };
