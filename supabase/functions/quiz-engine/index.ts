@@ -472,7 +472,7 @@ async function getQuestionsAndOptions(
   quizId: string
 ) {
   const questions = await getRows(supabaseUrl, secretKey, "quiz_questions", {
-    select: "id,quiz_id,question_order,question_type,prompt,marks,image_path,syllabus_topic_id",
+    select: "id,quiz_id,question_order,question_type,prompt,marks,image_path,image_paths,syllabus_topic_id",
     quiz_id: "eq." + quizId,
     order: "question_order.asc",
     limit: "200"
@@ -1056,16 +1056,21 @@ async function createQuizQuestion(
     ? input.question_type
     : null;
   const prompt = typeof input.prompt === "string" ? input.prompt.trim().slice(0, 12000) : "";
-  const imagePath = typeof input.image_path === "string" && input.image_path.length > 0
-    ? input.image_path
-    : null;
+  const rawImagePaths = Array.isArray(input.image_paths) ? input.image_paths : (typeof input.image_path === "string" && input.image_path ? [input.image_path] : []);
+  const imagePaths = [...new Set(rawImagePaths.filter((path): path is string => typeof path === "string" && path.length > 0))];
+  const imagePath = imagePaths[0] ?? null;
+  const rawGuidePaths = Array.isArray(input.marking_guide_image_paths) ? input.marking_guide_image_paths : [];
+  const guideImagePaths = [...new Set(rawGuidePaths.filter((path): path is string => typeof path === "string" && path.length > 0))];
   const marks = Number(input.marks);
   const topicId = typeof input.syllabus_topic_id === "string" ? input.syllabus_topic_id : "";
   if (!questionType) return { error: "Jenis soalan tidak sah.", status: 400 };
-  if (!prompt && !imagePath) return { error: "Masukkan teks soalan atau lampirkan gambar soalan.", status: 400 };
+  if (!prompt && !imagePaths.length) return { error: "Masukkan teks soalan atau lampirkan gambar soalan.", status: 400 };
+  if (imagePaths.length > 4 || guideImagePaths.length > 4) return { error: "Maksimum empat gambar dibenarkan bagi setiap bahagian.", status: 400 };
+  if ([...imagePaths, ...guideImagePaths].some((path) => !path.startsWith(quizId + "/"))) return { error: "Laluan gambar tidak sah.", status: 400 };
+  if (imagePaths.length > 0 && imagePaths.reduce((sum, path) => sum + path.length, 0) > 2000) return { error: "Jumlah data gambar soalan terlalu besar.", status: 413 };
   if (!Number.isFinite(marks) || marks < 0.5 || marks > 1000) return { error: "Markah soalan tidak sah.", status: 400 };
   if (!topicId) return { error: "Pilih bab kecil atau subbab silibus.", status: 400 };
-  if (imagePath && !imagePath.startsWith(quizId + "/")) return { error: "Laluan gambar soalan tidak sah.", status: 400 };
+  // Laluan imej disahkan di atas dan mesti berada dalam folder kuiz ini.
 
   const topics = await getRows(supabaseUrl, secretKey, "syllabus_topics", {
     select: "id,chapter_id",
@@ -1090,7 +1095,7 @@ async function createQuizQuestion(
   const optionCodes = ["A", "B", "C", "D"];
   if (questionType === "objective") {
     if (optionValues.length !== 4) return { error: "Soalan objektif memerlukan empat pilihan jawapan.", status: 400 };
-    if (!imagePath && optionValues.some((value) => typeof value !== "string" || !value.trim())) {
+    if (!imagePaths.length && optionValues.some((value) => typeof value !== "string" || !value.trim())) {
       return { error: "Lengkapkan pilihan A, B, C dan D, atau gunakan gambar yang mengandungi pilihan jawapan.", status: 400 };
     }
     if (typeof input.correct_option_code !== "string" || !optionCodes.includes(input.correct_option_code)) {
@@ -1105,6 +1110,7 @@ async function createQuizQuestion(
     prompt: prompt || "Lihat gambar soalan",
     marks,
     image_path: imagePath,
+    image_paths: imagePaths,
     syllabus_topic_id: topicId
   }]);
   const question = created[0];
@@ -1128,6 +1134,7 @@ async function createQuizQuestion(
       question_id: String(question.id),
       correct_option_id: correctOptionId,
       marking_guide: questionType === "structured" && typeof input.marking_guide === "string" ? input.marking_guide.trim() : null,
+      marking_guide_image_paths: questionType === "structured" ? guideImagePaths : [],
       updated_by: callerId,
       updated_at: new Date().toISOString()
     }], "question_id");
