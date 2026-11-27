@@ -227,16 +227,22 @@ async function signQuestionImagePaths(
   }
 
   const questionRows = await getRows(supabaseUrl, secretKey, "quiz_questions", {
-    select: "image_path",
+    select: "id,image_path,image_paths",
     quiz_id: "eq." + quizId,
-    image_path: "in.(" + paths.join(",") + ")",
     limit: "200"
   });
-  const allowedPaths = new Set(questionRows
-    .map((row) => String(row.image_path ?? ""))
-    .filter(Boolean));
+  const allowedPaths = new Set<string>();
+  for (const row of questionRows) {
+    if (typeof row.image_path === "string") allowedPaths.add(row.image_path);
+    if (Array.isArray(row.image_paths)) row.image_paths.forEach((path) => { if (typeof path === "string") allowedPaths.add(path); });
+  }
+  if (isStaff(profile)) {
+    const questionIds = questionRows.map((row) => String(row.id));
+    const guideRows = questionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_answer_keys", { select: "marking_guide_image_paths", question_id: "in.(" + questionIds.join(",") + ")", limit: "500" }) : [];
+    guideRows.forEach((row) => { if (Array.isArray(row.marking_guide_image_paths)) row.marking_guide_image_paths.forEach((path) => { if (typeof path === "string") allowedPaths.add(path); }); });
+  }
   if (paths.some((path) => !allowedPaths.has(path))) {
-    return { error: "Satu atau lebih imej tidak dipautkan kepada kuiz ini.", status: 400 };
+    return { error: "Satu atau lebih imej tidak dipautkan kepada kuiz atau tidak dibenarkan.", status: 403 };
   }
 
   const signedResults = await Promise.all(paths.map(async (path) => {
