@@ -35,7 +35,7 @@ function renderMarkedAnswer(text:string,annotations:MarkAnnotation[]|null|undefi
 }
 type A={id:string;student_id:string;attempt_number:number;status:string;total_score:number;max_score:number;student:{full_name:string;form_level:number;class_name:string}|null;responses:R[]};
 type StudentRoster={user_id:string;full_name:string;form_level:number;class_name:string;academic_class_id:string};
-const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:"",syllabusTopicId:"",imageFile:null as {type:string;size:number}|null,imageBase64:"",imagePreviewUrl:"",imageItems:[] as {type:string;size:number;base64:string;preview:string}[]};
+const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:"",syllabusTopicId:"",imageFile:null as {type:string;size:number}|null,imageBase64:"",imagePreviewUrl:"",imageItems:[] as {type:string;size:number;base64:string;preview:string}[],guideItems:[] as {type:string;size:number;base64:string;preview:string}[]};
 function getMobileMenuItems(roleLabel: string) {
   if (roleLabel === "PENTADBIR") return [
     {label:"Dashboard pentadbir",href:"/admin/dashboard"},
@@ -66,7 +66,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  const [annotationDrafts,setAnnotationDrafts]=useState<Record<string,MarkAnnotation[]>>({});
  const [selectedRanges,setSelectedRanges]=useState<Record<string,{start:number;end:number;text:string}>>({});
  const answerRefs=useRef<Record<string,HTMLDivElement|null>>({});
- const imageInputRef=useRef<HTMLInputElement|null>(null);
+ const imageInputRef=useRef<HTMLInputElement|null>(null);\n const guideImageInputRef=useRef<HTMLInputElement|null>(null);
  const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [notice,setNotice]=useState("");
  const refresh=useCallback(async()=>{
   setLoading(true);
@@ -109,7 +109,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   const qs=(q.data??[]) as Question[];
   const arsRaw=(a.data?.attempts??[]) as A[];
   const imagePaths=[...new Set([
-   ...qs.flatMap(item=>[item.image_path,...(item.image_paths??[])]),
+   ...qs.flatMap(item=>[item.image_path,...(item.image_paths??[])]),\n   ...arsRaw.flatMap(attempt=>attempt.responses.flatMap(response=>(response.question?.marking_guide_image_paths??[]))),
    ...arsRaw.flatMap(attempt=>attempt.responses.flatMap(response=>[response.question?.image_path??null,...(response.question?.image_paths??[])]))
   ].filter((path):path is string=>typeof path==="string"&&path.length>0))];
   const signedResult=imagePaths.length
@@ -123,7 +123,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   const withImage=(question:Question):Question=>({
    ...question,
    image_url:question.image_path?signedMap.get(question.image_path)??null:null,
-   image_urls:(question.image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url))
+   image_urls:(question.image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url)),\n   marking_guide_image_urls:(question.marking_guide_image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url))
   });
   setQuestions(qs.map(withImage));
   const ids=new Set(qs.map(question=>question.id));
@@ -135,7 +135,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     question:response.question?{
      ...response.question,
      image_url:response.question.image_path?signedMap.get(response.question.image_path)??null:null,
-     image_urls:(response.question.image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url))
+     image_urls:(response.question.image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url)),\n     marking_guide_image_urls:(response.question.marking_guide_image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url))
     }:null
    }))
   }));
@@ -291,6 +291,19 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
 
  function removeQuestionImage(index:number){setForm(current=>{const imageItems=current.imageItems.filter((_,i)=>i!==index);const first=imageItems[0];return {...current,imageItems,imageFile:first?{type:first.type,size:first.size}:null,imageBase64:first?.base64??"",imagePreviewUrl:first?.preview??""};});}
 
+ async function chooseGuideImage(file:File|null){
+  if(!file)return;
+  if(form.guideItems.length>=4){setError("Maksimum empat gambar panduan pemarkahan dibenarkan.");if(guideImageInputRef.current)guideImageInputRef.current.value="";return;}
+  if(!["image/jpeg","image/png","image/webp"].includes(file.type)){setError("Format gambar tidak disokong. Gunakan JPG, PNG atau WebP.");return;}
+  if(file.size>4*1024*1024){setError("Saiz setiap gambar maksimum 4 MB.");return;}
+  try{
+   const dataUrl=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>typeof reader.result==="string"?resolve(reader.result):reject(new Error("Fail tidak dapat dibaca."));reader.onerror=()=>reject(new Error("Pelayar tidak dapat membaca fail."));reader.readAsDataURL(file);});
+   const comma=dataUrl.indexOf(",");
+   setForm(current=>({...current,guideItems:[...current.guideItems,{type:file.type,size:file.size,base64:dataUrl.slice(comma+1),preview:dataUrl}]}));
+   setError("");
+  }catch(err){setError(err instanceof Error?err.message:"Gambar panduan gagal dibaca.");}
+ }
+ function removeGuideImage(index:number){setForm(current=>({...current,guideItems:current.guideItems.filter((_,i)=>i!==index)}));}
  async function addQuestion(e:FormEvent){
   e.preventDefault();
   if(!form.syllabusTopicId){
@@ -307,16 +320,23 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   }
   setBusy(true);setError("");setNotice("");
   let imagePath:string|null=null;
-  const imagePaths:string[]=[];
+  const imagePaths:string[]=[];\n  const guideImagePaths:string[]=[];
   let createdQuestionId:string|null=null;
   try{
-   if(form.imageItems.length>4||form.imageItems.reduce((sum,item)=>sum+item.size,0)>16*1024*1024)throw new Error("Had maksimum empat gambar dan 16 MB bagi bahagian ini.");
+   if(form.imageItems.length>4||form.imageItems.reduce((sum,item)=>sum+item.size,0)>16*1024*1024||form.guideItems.length>4||form.guideItems.reduce((sum,item)=>sum+item.size,0)>16*1024*1024)throw new Error("Had maksimum empat gambar dan 16 MB bagi setiap bahagian.");
    for(const item of form.imageItems){
     if(item.size>4*1024*1024)throw new Error("Saiz setiap gambar maksimum 4 MB.");
     const {data:uploaded,error:uploadError}=await s.functions.invoke("quiz-engine",{body:{action:"upload_question_image",quiz_id:quizId,mime_type:item.type,image_base64:item.base64,category:"question"}});
     if(uploadError||uploaded?.error)throw new Error("Muat naik gambar gagal: "+(uploadError?.message??uploaded?.error??"Ralat tidak diketahui."));
     if(typeof uploaded?.image_path!=="string"||!uploaded.image_path.startsWith(quizId+"/"))throw new Error("Pelayan tidak memulangkan laluan gambar yang sah.");
     imagePaths.push(uploaded.image_path);
+   }
+   for(const item of form.guideItems){
+    if(item.size>4*1024*1024)throw new Error("Saiz setiap gambar panduan maksimum 4 MB.");
+    const {data:uploaded,error:uploadError}=await s.functions.invoke("quiz-engine",{body:{action:"upload_question_image",quiz_id:quizId,mime_type:item.type,image_base64:item.base64,category:"guide"}});
+    if(uploadError||uploaded?.error)throw new Error("Muat naik gambar panduan gagal: "+(uploadError?.message??uploaded?.error??"Ralat tidak diketahui."));
+    if(typeof uploaded?.image_path!=="string"||!uploaded.image_path.startsWith(quizId+"/guide/"))throw new Error("Laluan gambar panduan tidak sah.");
+    guideImagePaths.push(uploaded.image_path);
    }
    imagePath=imagePaths[0]??null;
 
@@ -331,7 +351,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     syllabus_topic_id:form.syllabusTopicId,
     options:form.kind==="objective"?form.options.map(value=>value.trim()):[],
     correct_option_code:form.kind==="objective"?form.correct:null,
-    marking_guide:form.kind==="structured"?form.guide.trim():null
+    marking_guide:form.kind==="structured"?form.guide.trim():null,\n    marking_guide_image_paths:form.kind==="structured"?guideImagePaths:[]
    }});
    if(createError||created?.error)throw new Error("Penyimpanan soalan gagal: "+(createError?.message??created?.error??"Ralat tidak diketahui."));
    createdQuestionId=created.question?.id??null;
@@ -503,7 +523,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    <input ref={imageInputRef} type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={event=>{Array.from(event.currentTarget.files??[]).forEach(file=>void chooseQuestionImage(file));event.currentTarget.value="";}} disabled={busy||form.imageItems.length>=4}/>
   </label>
   {form.imageItems.map((item,index)=><div className={styles.questionImageLocalPreview} key={item.preview.slice(-32)}><img src={item.preview} alt={"Pratonton gambar soalan "+(index+1)}/><button type="button" className={styles.removeQuestionImageButton} disabled={busy} onClick={()=>removeQuestionImage(index)}>Buang gambar {index+1}</button></div>)}
- </div>{form.kind==="objective"?<>{form.options.map((v,i)=><label key={i}>Pilihan {["A","B","C","D"][i]}<input required={!form.imageFile} value={v} onChange={e=>setForm(x=>({...x,options:x.options.map((o,j)=>i===j?e.target.value:o)}))} placeholder={form.imageItems.length?"Sudah tertera dalam gambar — boleh dikosongkan":"Masukkan teks pilihan jawapan"}/></label>)}{form.imageFile?<p className={styles.optionEntryHint}>Pilihan A, B, C dan D boleh dikosongkan kerana sudah terdapat dalam gambar. Ruang yang dikosongkan akan dipaparkan kepada murid sebagai huruf pilihan sahaja. Pilih jawapan betul untuk pemarkahan automatik.</p>:null}<label className={styles.fullWidth}>Jawapan betul — wajib untuk pemarkahan automatik<select value={form.correct} onChange={e=>setForm({...form,correct:e.target.value})}>{["A","B","C","D"].map(x=><option key={x}>{x}</option>)}</select></label></>:<label className={styles.fullWidth}>Panduan pemarkahan guru<textarea rows={3} value={form.guide} onChange={e=>setForm({...form,guide:e.target.value})}/><small>Tidak dipaparkan kepada murid.</small></label>}<button className={styles.primaryButton} disabled={busy}>{busy?"Menyimpan...":"Tambah soalan"}</button></form></div></div></section>
+ </div>{form.kind==="objective"?<>{form.options.map((v,i)=><label key={i}>Pilihan {["A","B","C","D"][i]}<input required={!form.imageFile} value={v} onChange={e=>setForm(x=>({...x,options:x.options.map((o,j)=>i===j?e.target.value:o)}))} placeholder={form.imageItems.length?"Sudah tertera dalam gambar — boleh dikosongkan":"Masukkan teks pilihan jawapan"}/></label>)}{form.imageFile?<p className={styles.optionEntryHint}>Pilihan A, B, C dan D boleh dikosongkan kerana sudah terdapat dalam gambar. Ruang yang dikosongkan akan dipaparkan kepada murid sebagai huruf pilihan sahaja. Pilih jawapan betul untuk pemarkahan automatik.</p>:null}<label className={styles.fullWidth}>Jawapan betul — wajib untuk pemarkahan automatik<select value={form.correct} onChange={e=>setForm({...form,correct:e.target.value})}>{["A","B","C","D"].map(x=><option key={x}>{x}</option>)}</select></label></>:<label className={styles.fullWidth}>Panduan pemarkahan guru<textarea rows={3} value={form.guide} onChange={e=>setForm({...form,guide:e.target.value})}/><small>Tidak dipaparkan kepada murid.</small></label><div className={styles.questionImageUploader}><div className={styles.questionImageUploadCopy}><strong>Gambar panduan pemarkahan (guru sahaja)</strong><span>Boleh gabungkan teks dan gambar. Murid tidak akan menerima imej panduan ini.</span><small>JPG, PNG atau WebP · Maksimum 4 MB setiap imej · 4 imej / 16 MB</small></div><label className={styles.imageUploadButton}>Pilih gambar panduan<input ref={guideImageInputRef} type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={event=>{Array.from(event.currentTarget.files??[]).forEach(file=>void chooseGuideImage(file));event.currentTarget.value="";}} disabled={busy||form.guideItems.length>=4}/></label>{form.guideItems.map((item,index)=><div className={styles.questionImageLocalPreview} key={item.preview.slice(-32)}><img src={item.preview} alt={"Pratonton panduan "+(index+1)}/><button type="button" className={styles.removeQuestionImageButton} disabled={busy} onClick={()=>removeGuideImage(index)}>Buang gambar panduan {index+1}</button></div>)}</div>}<button className={styles.primaryButton} disabled={busy}>{busy?"Menyimpan...":"Tambah soalan"}</button></form></div></div></section>
  <section className={styles.panel+" "+styles.reviewPanel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>LANGKAH 3</span><h2>Keputusan dan semakan</h2></div><button className={styles.textButton} type="button" onClick={()=>void detail()}>Muat semula</button></div>{roster.length>0?<section className={styles.markCollectionPanel}>
  <div className={styles.markCollectionHeading}><div><span className={styles.eyebrow}>RUMUSAN KELAS</span><h3>Kutipan markah setiap murid</h3><p>Senarai ini hanya memaparkan murid dalam kelas yang berada di bawah penugasan akaun guru. Markah terbaik dikira sekali bagi setiap murid.</p></div><span className={styles.markCollectionCount}>{studentSummaries.length} MURID</span></div>
  <div className={styles.markCollectionStats}>
@@ -541,7 +561,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  </table></div>
  <p className={styles.markCollectionFootnote}>Murid tanpa percubaan turut disenaraikan. Percubaan belum dihantar dan jawapan yang menunggu semakan tidak dikira sebagai markah akhir.</p>
 </section>:<div className={styles.emptyText}>Tiada murid dalam kelas yang ditugaskan kepada akaun ini untuk kuiz berkenaan.</div>}
-{attempts.length===0?<p className={styles.emptyText}>Belum ada percubaan murid.</p>:<div className={styles.reviewLayout}><div className={styles.attemptList}>{attempts.map(a=><button type="button" key={a.id} className={a.id===attemptId?styles.attemptItemActive:styles.attemptItem} onClick={()=>setAttemptId(a.id)}><strong>{a.student?.full_name??"Murid"}</strong><small>{a.student?"T"+a.student.form_level+" · "+a.student.class_name:""} · Percubaan {a.attempt_number}</small><span className={a.status==="graded"?styles.publishedTag:styles.draftTag}>{quizStatusLabel(a.status)}</span><small>{a.total_score}/{a.max_score} markah</small></button>)}</div><div className={styles.responseReview}>{selectedAttempt?<><div className={styles.resultSummary}><strong>{selectedAttempt.student?.full_name??"Murid"}</strong><strong>{selectedAttempt.total_score}/{selectedAttempt.max_score}</strong></div>{selectedAttempt.responses.map((r,i)=><article className={styles.responseCard} key={r.id}><div className={styles.questionMeta}><span>SOALAN {r.question?.question_order??i+1}</span><span>{r.question?.marks??0} markah</span></div><div className={styles.questionSyllabusTag}>{syllabusTopics.find(topic=>topic.id===r.question?.syllabus_topic_id)?.topic_code} · {syllabusTopics.find(topic=>topic.id===r.question?.syllabus_topic_id)?.title??"Subbab tidak ditemui"}</div>{r.question?.image_url?<img className={styles.questionImagePreview} src={r.question.image_url} alt={"Gambar soalan "+(r.question.question_order??i+1)}/>:null}{r.question?.prompt!=="Lihat gambar soalan"?<p>{r.question?.prompt}</p>:null}{r.question?.question_type==="structured"&&r.question?.marking_guide?<div className={styles.responseInfo}>Panduan pemarkahan guru: {r.question.marking_guide}</div>:null}{r.question?.question_type==="objective"?<div className={styles.responseInfo}>Jawapan {r.selected_option?.option_code??"—"}{r.selected_option?.option_text?" · "+r.selected_option.option_text:""} · Markah automatik {r.auto_score??0}</div>:<><div
+{attempts.length===0?<p className={styles.emptyText}>Belum ada percubaan murid.</p>:<div className={styles.reviewLayout}><div className={styles.attemptList}>{attempts.map(a=><button type="button" key={a.id} className={a.id===attemptId?styles.attemptItemActive:styles.attemptItem} onClick={()=>setAttemptId(a.id)}><strong>{a.student?.full_name??"Murid"}</strong><small>{a.student?"T"+a.student.form_level+" · "+a.student.class_name:""} · Percubaan {a.attempt_number}</small><span className={a.status==="graded"?styles.publishedTag:styles.draftTag}>{quizStatusLabel(a.status)}</span><small>{a.total_score}/{a.max_score} markah</small></button>)}</div><div className={styles.responseReview}>{selectedAttempt?<><div className={styles.resultSummary}><strong>{selectedAttempt.student?.full_name??"Murid"}</strong><strong>{selectedAttempt.total_score}/{selectedAttempt.max_score}</strong></div>{selectedAttempt.responses.map((r,i)=><article className={styles.responseCard} key={r.id}><div className={styles.questionMeta}><span>SOALAN {r.question?.question_order??i+1}</span><span>{r.question?.marks??0} markah</span></div><div className={styles.questionSyllabusTag}>{syllabusTopics.find(topic=>topic.id===r.question?.syllabus_topic_id)?.topic_code} · {syllabusTopics.find(topic=>topic.id===r.question?.syllabus_topic_id)?.title??"Subbab tidak ditemui"}</div>{r.question?.image_url?<img className={styles.questionImagePreview} src={r.question.image_url} alt={"Gambar soalan "+(r.question.question_order??i+1)}/>:null}{r.question?.prompt!=="Lihat gambar soalan"?<p>{r.question?.prompt}</p>:null}{r.question?.question_type==="structured"&&(r.question?.marking_guide||r.question?.marking_guide_image_urls?.length)?<div className={styles.responseInfo}><strong>Panduan pemarkahan guru (rahsia)</strong>{r.question.marking_guide?<p>{r.question.marking_guide}</p>:null}{(r.question.marking_guide_image_urls??[]).map((url,index)=><img key={url} className={styles.questionImagePreview} src={url} alt={"Panduan pemarkahan "+(index+1)}/>)}</div>:null}{r.question?.question_type==="objective"?<div className={styles.responseInfo}>Jawapan {r.selected_option?.option_code??"—"}{r.selected_option?.option_text?" · "+r.selected_option.option_text:""} · Markah automatik {r.auto_score??0}</div>:<><div
  ref={node=>{answerRefs.current[r.id]=node;}}
  className={styles.studentAnswer+" "+styles.teacherSelectableAnswer}
  onMouseUp={()=>captureSelection(r.id)}
