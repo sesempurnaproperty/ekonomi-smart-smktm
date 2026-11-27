@@ -290,7 +290,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   try{
    if(form.imageFile){
     if(form.imageFile.size>4*1024*1024)throw new Error("Saiz gambar maksimum ialah 4 MB. Sila kecilkan gambar dan cuba semula.");
-    const imageBase64=form.imageBase64;\n    if(!imageBase64)throw new Error("Data gambar belum tersedia. Sila pilih semula gambar.");
+    const imageBase64=form.imageBase64;
+    if(!imageBase64)throw new Error("Data gambar belum tersedia. Sila pilih semula gambar.");
     const {data:uploaded,error:uploadError}=await s.functions.invoke("quiz-engine",{body:{
      action:"upload_question_image",
      quiz_id:quizId,
