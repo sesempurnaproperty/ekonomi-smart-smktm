@@ -1145,7 +1145,7 @@ async function createQuizQuestion(
   if (!questionType) return { error: "Jenis soalan tidak sah.", status: 400 };
   if (!prompt && !imagePaths.length) return { error: "Masukkan teks soalan atau lampirkan gambar soalan.", status: 400 };
   if (imagePaths.length > 4 || guideImagePaths.length > 4) return { error: "Maksimum empat gambar dibenarkan bagi setiap bahagian.", status: 400 };
-  if ([...imagePaths, ...guideImagePaths].some((path) => !path.startsWith(quizId + "/"))) return { error: "Laluan gambar tidak sah.", status: 400 };
+  if (imagePaths.some((path) => !path.startsWith(quizId + "/") || path.startsWith(quizId + "/guide/") || path.startsWith(quizId + "/answers/"))) return { error: "Laluan gambar soalan tidak sah.", status: 400 };\n  if (guideImagePaths.some((path) => !path.startsWith(quizId + "/guide/"))) return { error: "Laluan gambar panduan pemarkahan tidak sah.", status: 400 };\n  if (questionType !== "structured" && guideImagePaths.length) return { error: "Panduan pemarkahan hanya dibenarkan untuk soalan struktur.", status: 400 };
   if (imagePaths.length > 0 && imagePaths.reduce((sum, path) => sum + path.length, 0) > 2000) return { error: "Jumlah data gambar soalan terlalu besar.", status: 413 };
   if (!Number.isFinite(marks) || marks < 0.5 || marks > 1000) return { error: "Markah soalan tidak sah.", status: 400 };
   if (!topicId) return { error: "Pilih bab kecil atau subbab silibus.", status: 400 };
