@@ -291,7 +291,7 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
 
   async function addAnswerImages(questionId:string, files:FileList|null){
     if(!files||!active)return;
-    const existing=answers[questionId]?.answer_images??[];
+    const existing=[...(answers[questionId]?.answer_images??[])];
     for(const file of Array.from(files)){
       if(existing.length>=4){setError("Maksimum empat gambar bagi setiap soalan struktur.");break;}
       if(!["image/jpeg","image/png","image/webp"].includes(file.type)){setError("Format gambar jawapan mestilah JPG, PNG atau WebP.");continue;}
