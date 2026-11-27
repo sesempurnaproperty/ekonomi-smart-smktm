@@ -371,9 +371,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  async function removeQuiz(){
   if(!selected)return;
   const ok=window.confirm(
-   "PADAM KESELURUHAN KUIZ?
-
-Kuiz '"+selected.title+"' akan dipadam bersama semua soalan, pilihan jawapan, kunci jawapan, jawapan murid, markah dan sejarah percubaan yang berkaitan. Tindakan ini kekal dan tidak boleh dibatalkan. Teruskan?"
+   "PADAM KESELURUHAN KUIZ?\n\nKuiz '"+selected.title+"' akan dipadam bersama semua soalan, pilihan jawapan, kunci jawapan, jawapan murid, markah dan sejarah percubaan yang berkaitan. Tindakan ini kekal dan tidak boleh dibatalkan. Teruskan?"
   );
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
@@ -387,9 +385,7 @@ Kuiz '"+selected.title+"' akan dipadam bersama semua soalan, pilihan jawapan, ku
 
  async function removeQuestion(question:Question){
   const ok=window.confirm(
-   "PADAM SOALAN "+question.question_order+"?
-
-Soalan ini serta pilihan jawapan dan kunci jawapannya akan dipadam. Kuiz mesti berstatus draf. Semua percubaan murid yang berkaitan perlu direset terlebih dahulu supaya rekod jawapan dan markah tidak terjejas secara senyap. Jika masih ada percubaan, sistem akan memaklumkan sebab sebenar dan jumlah yang masih berbaki. Teruskan?"
+   "PADAM SOALAN "+question.question_order+"?\n\nSoalan ini serta pilihan jawapan dan kunci jawapannya akan dipadam. Kuiz mesti berstatus draf. Semua percubaan murid yang berkaitan perlu direset terlebih dahulu supaya rekod jawapan dan markah tidak terjejas secara senyap. Jika masih ada percubaan, sistem akan memaklumkan sebab sebenar dan jumlah yang masih berbaki. Teruskan?"
   );
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
