@@ -197,8 +197,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     total.questions+=1;
     totals.set(topicId,total);
    });
-  });
-  return syllabusTopics.map(topic=>{
+  });  return syllabusTopics.map(topic=>{
    const total=totals.get(topic.id);
    const maximum=total?.maximum??0;
    const earned=total?.earned??0;
@@ -243,25 +242,43 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    if(imageInputRef.current)imageInputRef.current.value="";
    return;
   }
-  // Read the selected file immediately while the Android document-provider
-  // grant is active. Do not retain a File handle for a later async read.
-  const reader=new FileReader();
-  reader.onload=()=>{
-   const dataUrl=typeof reader.result==="string"?reader.result:"";
-   const comma=dataUrl.indexOf(",");
-   if(comma<0){
-    setError("Fail gambar tidak dapat dibaca. Sila pilih gambar semula.");
-    if(imageInputRef.current)imageInputRef.current.value="";
-    return;
+  setError("");
+  try{
+   // Read the file immediately after selection. Use the File API first,
+   // then fall back to FileReader for browsers/document providers that do
+   // not implement arrayBuffer() reliably (including some Android pickers).
+   let dataUrl="";
+   try{
+    if(typeof file.arrayBuffer==="function"){
+     const buffer=await file.arrayBuffer();
+     const bytes=new Uint8Array(buffer);
+     let binary="";
+     const chunkSize=0x8000;
+     for(let offset=0;offset<bytes.length;offset+=chunkSize){
+      binary+=String.fromCharCode(...bytes.subarray(offset,Math.min(offset+chunkSize,bytes.length)));
+     }
+     dataUrl="data:"+file.type+";base64,"+btoa(binary);
+    }
+   }catch{
+    dataUrl="";
    }
+   if(!dataUrl){
+    dataUrl=await new Promise<string>((resolve,reject)=>{
+     const reader=new FileReader();
+     reader.onload=()=>typeof reader.result==="string"?resolve(reader.result):reject(new Error("Bacaan fail tidak menghasilkan data imej."));
+     reader.onerror=()=>reject(new Error("Pelayar tidak dapat membaca fail yang dipilih."));
+     reader.onabort=()=>reject(new Error("Bacaan fail dibatalkan."));
+     reader.readAsDataURL(file);
+    });
+   }
+   const comma=dataUrl.indexOf(",");
+   if(comma<0)throw new Error("Fail gambar tidak dapat dibaca. Sila pilih gambar semula.");
    setForm(current=>({...current,imageFile:{type:file.type,size:file.size},imageBase64:dataUrl.slice(comma+1),imagePreviewUrl:dataUrl}));
-   setError("");
-  };
-  reader.onerror=()=>{
-   setError("Telefon tidak dapat membaca fail gambar. Cuba pilih gambar daripada Galeri telefon.");
+  }catch(cause){
+   setForm(current=>({...current,imageFile:null,imageBase64:"",imagePreviewUrl:""}));
    if(imageInputRef.current)imageInputRef.current.value="";
-  };
-  reader.readAsDataURL(file);
+   setError(cause instanceof Error?"Gagal membaca gambar: "+cause.message:"Gagal membaca fail gambar. Cuba pilih semula melalui Galeri atau folder komputer.");
+  }
  }
 
  function clearQuestionImage(){
@@ -289,7 +306,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   try{
    if(form.imageFile){
     if(form.imageFile.size>4*1024*1024)throw new Error("Saiz gambar maksimum ialah 4 MB. Sila kecilkan gambar dan cuba semula.");
-    const imageBase64=form.imageBase64;\n    if(!imageBase64)throw new Error("Data gambar belum tersedia. Sila pilih semula gambar.");
+    const imageBase64=form.imageBase64;
+    if(!imageBase64)throw new Error("Data gambar belum tersedia. Sila pilih semula gambar.");
     const {data:uploaded,error:uploadError}=await s.functions.invoke("quiz-engine",{body:{
      action:"upload_question_image",
      quiz_id:quizId,
@@ -337,9 +355,11 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  async function resetAttempts(){
   if(!selected)return;
   const scopeText=roleLabel==="GURU"?"percubaan murid daripada kelas yang ditugaskan kepada akaun anda":"semua percubaan murid";
-  const ok=window.confirm(
-   "RESET PERCOBAAN KUIZ?\n\nTindakan ini akan memadam "+scopeText+", termasuk jawapan, markah dan ulasan guru. Kuiz akan ditarik balik dan perlu diterbitkan semula. Tindakan ini tidak boleh dibatalkan. Teruskan?"
-  );
+  const ok=window.confirm([
+   "RESET PERCOBAAN KUIZ?",
+   "",
+   "Tindakan ini akan memadam "+scopeText+", termasuk jawapan, markah dan ulasan guru. Kuiz akan ditarik balik dan perlu diterbitkan semula. Tindakan ini tidak boleh dibatalkan. Teruskan?"
+  ].join("\n"));
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"reset_quiz_attempts",quiz_id:selected.id}});
@@ -352,9 +372,11 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
 
  async function removeQuiz(){
   if(!selected)return;
-  const ok=window.confirm(
-   "PADAM KESELURUHAN KUIZ?\n\nKuiz '"+selected.title+"' akan dipadam bersama semua soalan, pilihan jawapan, kunci jawapan, jawapan murid, markah dan sejarah percubaan yang berkaitan. Tindakan ini kekal dan tidak boleh dibatalkan. Teruskan?"
-  );
+  const ok=window.confirm([
+   "PADAM KESELURUHAN KUIZ?",
+   "",
+   "Kuiz '"+selected.title+"' akan dipadam bersama semua soalan, pilihan jawapan, kunci jawapan, jawapan murid, markah dan sejarah percubaan yang berkaitan. Tindakan ini kekal dan tidak boleh dibatalkan. Teruskan?"
+  ].join("\n"));
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"delete_quiz",quiz_id:selected.id}});
@@ -372,8 +394,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{
-   action:"delete_question",quiz_id:quizId,question_id:question.id
-  }});
+   action:"delete_question",quiz_id:quizId,question_id:question.id  }});
   setBusy(false);
   if(err){
    let message=err.message||"Soalan gagal dipadam.";
