@@ -14,7 +14,7 @@ type Quiz = {
   attempt_limit: number;
   status: string;
 };
-type MarkType = "right" | "wrong" | "tr" | "repeat";
+type AnswerImage={type:string;size:number;base64:string;preview:string;path?:string};\ntype MarkType = "right" | "wrong" | "tr" | "repeat";
 type MarkAnnotation = { id:string; start:number; end:number; text:string; type:MarkType; comment?:string };
 type SyllabusTopicInfo={
   id:string;topic_code:string;title:string;chapter_number:number;chapter_title:string;
@@ -56,7 +56,7 @@ type Active = {
   attempt: Attempt;
   quiz: { id: string; title: string; description: string | null };
   questions: Question[];
-  draft_responses?: { question_id: string; selected_option_id: string | null; response_text: string | null }[];
+  draft_responses?: { question_id: string; selected_option_id: string | null; response_text: string | null; answer_image_paths?:string[] }[];
 };
 type Result = {
   attempt_id: string;
@@ -121,7 +121,7 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [active, setActive] = useState<Active | null>(null);
-  const [answers, setAnswers] = useState<Record<string, { selected_option_id?: string; response_text?: string }>>({});
+  const [answers, setAnswers] = useState<Record<string, { selected_option_id?: string; response_text?: string; answer_image_paths?:string[]; answer_images?:AnswerImage[] }>>({});
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -288,6 +288,40 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
     }
   }
 
+  async function addAnswerImages(questionId:string, files:FileList|null){
+    if(!files||!active)return;
+    const existing=answers[questionId]?.answer_images??[];
+    for(const file of Array.from(files)){
+      if(existing.length>=4){setError("Maksimum empat gambar bagi setiap soalan struktur.");break;}
+      if(!["image/jpeg","image/png","image/webp"].includes(file.type)){setError("Format gambar jawapan mestilah JPG, PNG atau WebP.");continue;}
+      if(file.size>4*1024*1024){setError("Saiz setiap gambar jawapan maksimum 4 MB.");continue;}
+      if(existing.reduce((sum,item)=>sum+item.size,0)+file.size>16*1024*1024){setError("Jumlah saiz gambar jawapan maksimum 16 MB.");break;}
+      try{
+        const dataUrl=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>typeof reader.result==="string"?resolve(reader.result):reject(new Error("Fail tidak dapat dibaca."));reader.onerror=()=>reject(new Error("Pelayar gagal membaca fail."));reader.readAsDataURL(file);});
+        const comma=dataUrl.indexOf(",");
+        const item:AnswerImage={type:file.type,size:file.size,base64:dataUrl.slice(comma+1),preview:dataUrl};
+        setAnswers(current=>({...current,[questionId]:{...current[questionId],answer_images:[...(current[questionId]?.answer_images??[]),item]}}));
+        existing.push(item);
+      }catch(err){setError(err instanceof Error?err.message:"Gambar gagal dibaca.");}
+    }
+  }
+  async function uploadAnswerImages(questionId:string){
+    if(!active)return [];
+    const current=answers[questionId]?.answer_images??[];
+    const paths:string[]=[];
+    for(const item of current){
+      if(item.path){paths.push(item.path);continue;}
+      const {data,error:uploadError}=await supabase.functions.invoke("quiz-engine",{body:{action:"upload_question_image",quiz_id:active.quiz.id,mime_type:item.type,image_base64:item.base64,category:"answer",attempt_id:active.attempt.id,question_id:questionId}});
+      if(uploadError||data?.error)throw new Error(uploadError?.message??data?.error??"Gambar jawapan gagal dimuat naik.");
+      if(typeof data?.image_path!=="string"||!data.image_path.startsWith(active.quiz.id+"/answers/"))throw new Error("Laluan gambar jawapan tidak sah.");
+      paths.push(data.image_path);
+    }
+    setAnswers(current=>({...current,[questionId]:{...current[questionId],answer_image_paths:paths,answer_images:current[questionId]?.answer_images?.map((item,index)=>({...item,path:paths[index]}))??[]}}));
+    return paths;
+  }
+  function removeAnswerImage(questionId:string,index:number){
+    setAnswers(current=>{const images=(current[questionId]?.answer_images??[]).filter((_,i)=>i!==index);return {...current,[questionId]:{...current[questionId],answer_images:images,answer_image_paths:images.map(item=>item.path).filter((path):path is string=>Boolean(path))}};});
+  }
   function choose(questionId: string, optionId: string) {
     setAnswers((current) => ({ ...current, [questionId]: { ...current[questionId], selected_option_id: optionId } }));
     void saveDraft(questionId, optionId, null);
@@ -306,7 +340,7 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
     const unanswered = active.questions.filter((question) =>
       question.question_type === "objective"
         ? !answers[question.id]?.selected_option_id
-        : !answers[question.id]?.response_text?.trim()
+        : (!answers[question.id]?.response_text?.trim() && !(answers[question.id]?.answer_images?.length || answers[question.id]?.answer_image_paths?.length))
     ).length;
     const confirmation = unanswered
       ? unanswered + " soalan belum dijawab. Hantar juga?"
@@ -535,6 +569,14 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
                   <label className={styles.fullWidth}>Jawapan anda
                     <textarea rows={5} value={answers[question.id]?.response_text ?? ""} onChange={(event) => write(question.id, event.target.value)} onBlur={() => saveTextDraft(question.id)} placeholder="Tulis jawapan anda di sini..." />
                   </label>
+                  <div className={styles.questionImageUploader}>
+                    <strong>Gambar jawapan (pilihan)</strong>
+                    <small>JPG, PNG atau WebP · Maksimum 4 MB setiap gambar · 4 gambar / 16 MB. Boleh hantar teks, gambar atau kedua-duanya.</small>
+                    <label className={styles.imageUploadButton}>Tambah gambar jawapan
+                      <input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy||(answers[question.id]?.answer_images?.length??0)>=4} onChange={event=>{void addAnswerImages(question.id,event.currentTarget.files);event.currentTarget.value="";}}/>
+                    </label>
+                    {(answers[question.id]?.answer_images??[]).map((item,index)=><div className={styles.questionImageLocalPreview} key={item.path??item.preview.slice(-30)}>{item.preview?<img src={item.preview} alt={"Pratonton jawapan "+(index+1)}/>:<span>Gambar telah disimpan</span>}<button type="button" className={styles.removeQuestionImageButton} disabled={busy} onClick={()=>removeAnswerImage(question.id,index)}>Buang gambar {index+1}</button></div>)}
+                  </div>
                 )}
               </article>
             ))}
