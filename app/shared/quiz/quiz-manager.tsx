@@ -8,7 +8,7 @@ type Quiz={id:string;title:string;description:string|null;target_form_level:numb
 type Chapter={id:string;form_level:number;chapter_number:number;title:string};
 type SyllabusChapter={id:string;chapter_number:number;title:string;display_order:number};
 type SyllabusTopic={id:string;chapter_id:string;topic_code:string;title:string;display_order:number};
-type Question={id:string;quiz_id:string;question_order:number;question_type:"objective"|"structured";prompt:string;marks:number;image_path:string|null;image_url?:string|null;syllabus_topic_id:string};
+type Question={id:string;quiz_id:string;question_order:number;question_type:"objective"|"structured";prompt:string;marks:number;image_path:string|null;image_paths?:string[];image_url?:string|null;image_urls?:string[];syllabus_topic_id:string};
 type Option={id:string;question_id:string;option_code:string;option_text:string;option_order:number};
 type MarkType="right"|"wrong"|"tr"|"repeat";
 type MarkAnnotation={id:string;start:number;end:number;text:string;type:MarkType;comment?:string};
@@ -109,8 +109,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   const qs=(q.data??[]) as Question[];
   const arsRaw=(a.data?.attempts??[]) as A[];
   const imagePaths=[...new Set([
-   ...qs.map(item=>item.image_path),
-   ...arsRaw.flatMap(attempt=>attempt.responses.map(response=>response.question?.image_path??null))
+   ...qs.flatMap(item=>[item.image_path,...(item.image_paths??[])]),
+   ...arsRaw.flatMap(attempt=>attempt.responses.flatMap(response=>[response.question?.image_path??null,...(response.question?.image_paths??[])]))
   ].filter((path):path is string=>typeof path==="string"&&path.length>0))];
   const signedResult=imagePaths.length
    ? await s.functions.invoke("quiz-engine",{body:{action:"sign_question_images",quiz_id:quizId,image_paths:imagePaths}})
@@ -122,7 +122,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   const signedMap=new Map<string,string>((signedResult.data?.image_urls??[]).map((entry:{path:string;url:string})=>[entry.path,entry.url]));
   const withImage=(question:Question):Question=>({
    ...question,
-   image_url:question.image_path?signedMap.get(question.image_path)??null:null
+   image_url:question.image_path?signedMap.get(question.image_path)??null:null,
+   image_urls:(question.image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url))
   });
   setQuestions(qs.map(withImage));
   const ids=new Set(qs.map(question=>question.id));
@@ -133,7 +134,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     ...response,
     question:response.question?{
      ...response.question,
-     image_url:response.question.image_path?signedMap.get(response.question.image_path)??null:null
+     image_url:response.question.image_path?signedMap.get(response.question.image_path)??null:null,
+     image_urls:(response.question.image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url))
     }:null
    }))
   }));
@@ -478,7 +480,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   : null}
  <button className={styles.deleteButton} type="button" disabled={busy} onClick={()=>void removeQuiz()}>Padam kuiz</button>
 </div></div>
- <div className={styles.questionLayout}><div><h3>Soalan ({questions.length})</h3>{questions.length===0?<p className={styles.emptyText}>Tambahkan soalan untuk membina kuiz.</p>:questions.map(q=><article className={styles.questionCard} key={q.id}><div className={styles.questionMeta}><span>SOALAN {q.question_order}</span><span>{q.question_type==="objective"?"OBJEKTIF":"STRUKTUR"}</span><span>{q.marks} markah</span></div><div className={styles.questionSyllabusTag}>{syllabusTopics.find(topic=>topic.id===q.syllabus_topic_id)?.topic_code} · {syllabusTopics.find(topic=>topic.id===q.syllabus_topic_id)?.title??"Subbab tidak ditemui"}</div>{q.image_url?<img className={styles.questionImagePreview} src={q.image_url} alt={"Gambar soalan "+q.question_order}/>:null}{q.prompt!=="Lihat gambar soalan"?<p>{q.prompt}</p>:null}{q.question_type==="objective"?<ol className={styles.optionList} type="A">{options.filter(o=>o.question_id===q.id).map(o=><li key={o.id}>{o.option_text||"Pilihan terdapat dalam gambar"}</li>)}</ol>:<small>Jawapan struktur — ditanda secara manual.</small>}
+ <div className={styles.questionLayout}><div><h3>Soalan ({questions.length})</h3>{questions.length===0?<p className={styles.emptyText}>Tambahkan soalan untuk membina kuiz.</p>:questions.map(q=><article className={styles.questionCard} key={q.id}><div className={styles.questionMeta}><span>SOALAN {q.question_order}</span><span>{q.question_type==="objective"?"OBJEKTIF":"STRUKTUR"}</span><span>{q.marks} markah</span></div><div className={styles.questionSyllabusTag}>{syllabusTopics.find(topic=>topic.id===q.syllabus_topic_id)?.topic_code} · {syllabusTopics.find(topic=>topic.id===q.syllabus_topic_id)?.title??"Subbab tidak ditemui"}</div>{(q.image_urls?.length?q.image_urls:q.image_url?[q.image_url]:[]).map((url,index)=><img key={url} className={styles.questionImagePreview} src={url} alt={"Gambar soalan "+q.question_order+"-"+(index+1)}/>)}{q.prompt!=="Lihat gambar soalan"?<p>{q.prompt}</p>:null}{q.question_type==="objective"?<ol className={styles.optionList} type="A">{options.filter(o=>o.question_id===q.id).map(o=><li key={o.id}>{o.option_text||"Pilihan terdapat dalam gambar"}</li>)}</ol>:<small>Jawapan struktur — ditanda secara manual.</small>}
  <div className={styles.questionCardActions}>
   <span>{selected.status==="published"?"Kuiz diterbitkan — soalan baharu boleh ditambah.":attempts.length>0?"Reset percubaan sebelum memadam soalan.":"Soalan boleh dipadam."}</span>
   <button className={styles.questionDeleteButton} type="button" disabled={busy||selected.status==="published"} onClick={()=>void removeQuestion(q)}>Padam soalan</button>
