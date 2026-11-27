@@ -12,7 +12,7 @@ type Question={id:string;quiz_id:string;question_order:number;question_type:"obj
 type Option={id:string;question_id:string;option_code:string;option_text:string;option_order:number};
 type MarkType="right"|"wrong"|"tr"|"repeat";
 type MarkAnnotation={id:string;start:number;end:number;text:string;type:MarkType;comment?:string};
-type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;auto_score:number|null;teacher_score:number|null;feedback:string|null;marking_annotations?:MarkAnnotation[]|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null;image_path:string|null;image_paths?:string[];image_url?:string|null;image_urls?:string[];syllabus_topic_id:string}|null};
+type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;answer_image_paths?:string[];answer_image_urls?:string[];auto_score:number|null;teacher_score:number|null;feedback:string|null;marking_annotations?:MarkAnnotation[]|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null;image_path:string|null;image_paths?:string[];image_url?:string|null;image_urls?:string[];syllabus_topic_id:string}|null};
 const MARK_TYPES:{type:MarkType;symbol:string;label:string}[]=[
  {type:"right",symbol:"✓",label:"Mengandungi markah"},
  {type:"wrong",symbol:"✗",label:"Jawapan salah"},
@@ -110,7 +110,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   const arsRaw=(a.data?.attempts??[]) as A[];
   const imagePaths=[...new Set([
    ...qs.flatMap(item=>[item.image_path,...(item.image_paths??[])]),\n   ...arsRaw.flatMap(attempt=>attempt.responses.flatMap(response=>(response.question?.marking_guide_image_paths??[]))),
-   ...arsRaw.flatMap(attempt=>attempt.responses.flatMap(response=>[response.question?.image_path??null,...(response.question?.image_paths??[])]))
+   ...arsRaw.flatMap(attempt=>attempt.responses.flatMap(response=>[response.question?.image_path??null,...(response.question?.image_paths??[]),...(response.answer_image_paths??[])]))
   ].filter((path):path is string=>typeof path==="string"&&path.length>0))];
   const signedResult=imagePaths.length
    ? await s.functions.invoke("quiz-engine",{body:{action:"sign_question_images",quiz_id:quizId,image_paths:imagePaths}})
@@ -568,7 +568,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  onKeyUp={()=>captureSelection(r.id)}
  tabIndex={0}
  aria-label="Pilih perkataan dalam jawapan murid untuk menanda pemarkahan"
->{renderMarkedAnswer(r.response_text||"Tiada jawapan.",annotationDrafts[r.id],false)}</div>
+>{renderMarkedAnswer(r.response_text||"Tiada jawapan bertulis.",annotationDrafts[r.id],false)}</div>{(r.answer_image_urls??[]).map((url,index)=><img key={url} className={styles.questionImagePreview} src={url} alt={"Gambar jawapan murid "+(index+1)}/>)}
  <div className={styles.markingToolbar}>
   <div className={styles.markingToolbarHeading}>
    <strong>Tanda pemarkahan pada jawapan</strong>
