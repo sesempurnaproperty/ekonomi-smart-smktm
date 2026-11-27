@@ -35,7 +35,7 @@ function renderMarkedAnswer(text:string,annotations:MarkAnnotation[]|null|undefi
 }
 type A={id:string;student_id:string;attempt_number:number;status:string;total_score:number;max_score:number;student:{full_name:string;form_level:number;class_name:string}|null;responses:R[]};
 type StudentRoster={user_id:string;full_name:string;form_level:number;class_name:string;academic_class_id:string};
-const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:"",syllabusTopicId:"",imageFile:null as {type:string;size:number}|null,imageBase64:"",imagePreviewUrl:""};
+const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:"",syllabusTopicId:"",imageFile:null as {type:string;size:number}|null,imageBase64:"",imagePreviewUrl:"",imageItems:[] as {type:string;size:number;base64:string;preview:string}[]};
 function getMobileMenuItems(roleLabel: string) {
   if (roleLabel === "PENTADBIR") return [
     {label:"Dashboard pentadbir",href:"/admin/dashboard"},
@@ -231,6 +231,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  }
  async function chooseQuestionImage(file:File|null){
   if(!file)return;
+  if(form.imageItems.length>=4){setError("Maksimum empat gambar soalan dibenarkan.");if(imageInputRef.current)imageInputRef.current.value="";return;}
   const allowed=["image/jpeg","image/png","image/webp"];
   if(!allowed.includes(file.type)){
    setError("Format gambar tidak disokong. Gunakan JPG, PNG atau WebP.");
@@ -273,7 +274,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    }
    const comma=dataUrl.indexOf(",");
    if(comma<0)throw new Error("Fail gambar tidak dapat dibaca. Sila pilih gambar semula.");
-   setForm(current=>({...current,imageFile:{type:file.type,size:file.size},imageBase64:dataUrl.slice(comma+1),imagePreviewUrl:dataUrl}));
+   setForm(current=>({...current,imageFile:{type:file.type,size:file.size},imageBase64:dataUrl.slice(comma+1),imagePreviewUrl:dataUrl,imageItems:[...current.imageItems,{type:file.type,size:file.size,base64:dataUrl.slice(comma+1),preview:dataUrl}]}));
   }catch(cause){
    setForm(current=>({...current,imageFile:null,imageBase64:"",imagePreviewUrl:""}));
    if(imageInputRef.current)imageInputRef.current.value="";
@@ -282,9 +283,11 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  }
 
  function clearQuestionImage(){
-  setForm(current=>({...current,imageFile:null,imageBase64:"",imagePreviewUrl:""}));
+  setForm(current=>({...current,imageFile:null,imageBase64:"",imagePreviewUrl:"",imageItems:[]}));
   if(imageInputRef.current)imageInputRef.current.value="";
  }
+
+ function removeQuestionImage(index:number){setForm(current=>{const imageItems=current.imageItems.filter((_,i)=>i!==index);const first=imageItems[0];return {...current,imageItems,imageFile:first?{type:first.type,size:first.size}:null,imageBase64:first?.base64??"",imagePreviewUrl:first?.preview??""};});}
 
  async function addQuestion(e:FormEvent){
   e.preventDefault();
@@ -292,32 +295,28 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    setError("Pilih Bab kecil / subbab silibus untuk soalan ini.");
    return;
   }
-  if(!form.prompt.trim()&&!form.imageFile){
+  if(!form.prompt.trim()&&!form.imageItems.length){
    setError("Taip pernyataan soalan atau muat naik gambar soalan.");
    return;
   }
-  if(form.kind==="objective"&&!form.imageFile&&form.options.some(value=>!value.trim())){
+  if(form.kind==="objective"&&!form.imageItems.length&&form.options.some(value=>!value.trim())){
    setError("Lengkapkan pilihan A, B, C dan D, atau muat naik gambar yang sudah mengandungi pilihan jawapan.");
    return;
   }
   setBusy(true);setError("");setNotice("");
   let imagePath:string|null=null;
+  const imagePaths:string[]=[];
   let createdQuestionId:string|null=null;
   try{
-   if(form.imageFile){
-    if(form.imageFile.size>4*1024*1024)throw new Error("Saiz gambar maksimum ialah 4 MB. Sila kecilkan gambar dan cuba semula.");
-    const imageBase64=form.imageBase64;
-    if(!imageBase64)throw new Error("Data gambar belum tersedia. Sila pilih semula gambar.");
-    const {data:uploaded,error:uploadError}=await s.functions.invoke("quiz-engine",{body:{
-     action:"upload_question_image",
-     quiz_id:quizId,
-     mime_type:form.imageFile.type,
-     image_base64:imageBase64
-    }});
+   if(form.imageItems.length>4||form.imageItems.reduce((sum,item)=>sum+item.size,0)>16*1024*1024)throw new Error("Had maksimum empat gambar dan 16 MB bagi bahagian ini.");
+   for(const item of form.imageItems){
+    if(item.size>4*1024*1024)throw new Error("Saiz setiap gambar maksimum 4 MB.");
+    const {data:uploaded,error:uploadError}=await s.functions.invoke("quiz-engine",{body:{action:"upload_question_image",quiz_id:quizId,mime_type:item.type,image_base64:item.base64,category:"question"}});
     if(uploadError||uploaded?.error)throw new Error("Muat naik gambar gagal: "+(uploadError?.message??uploaded?.error??"Ralat tidak diketahui."));
     if(typeof uploaded?.image_path!=="string"||!uploaded.image_path.startsWith(quizId+"/"))throw new Error("Pelayan tidak memulangkan laluan gambar yang sah.");
-    imagePath=uploaded.image_path;
+    imagePaths.push(uploaded.image_path);
    }
+   imagePath=imagePaths[0]??null;
 
    const {data:created,error:createError}=await s.functions.invoke("quiz-engine",{body:{
     action:"create_question",
@@ -326,6 +325,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     prompt:form.prompt.trim()||(imagePath?"Lihat gambar soalan":""),
     marks:Number(form.marks),
     image_path:imagePath,
+    image_paths:imagePaths,
     syllabus_topic_id:form.syllabusTopicId,
     options:form.kind==="objective"?form.options.map(value=>value.trim()):[],
     correct_option_code:form.kind==="objective"?form.correct:null,
@@ -342,8 +342,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    if(createdQuestionId){
     await s.from("quiz_questions").delete().eq("id",createdQuestionId);
    }
-   if(imagePath){
-    await s.storage.from("quiz-question-images").remove([imagePath]);
+   if(imagePaths.length){
+    await s.storage.from("quiz-question-images").remove(imagePaths);
    }
    setError(cause instanceof Error?cause.message:"Soalan gagal disimpan.");
   }finally{
@@ -489,22 +489,19 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   <option value="">Pilih subbab bagi soalan ini</option>
   {syllabusTopics.filter(topic=>!selected?.syllabus_chapter_id||topic.chapter_id===selected.syllabus_chapter_id).map(topic=><option key={topic.id} value={topic.id}>{topic.topic_code} · {topic.title}</option>)}
  </select></label>
- <label className={styles.fullWidth}>Pernyataan / arahan soalan (pilihan jika menggunakan gambar)<textarea rows={3} required={!form.imageFile} value={form.prompt} onChange={e=>setForm({...form,prompt:e.target.value})} placeholder="Taip soalan di sini, atau muat naik gambar soalan di bawah..."/></label>
+ <label className={styles.fullWidth}>Pernyataan / arahan soalan (pilihan jika menggunakan gambar)<textarea rows={3} required={!form.imageItems.length} value={form.prompt} onChange={e=>setForm({...form,prompt:e.target.value})} placeholder="Taip soalan di sini, atau muat naik gambar soalan di bawah..."/></label>
  <div className={styles.questionImageUploader}>
   <div className={styles.questionImageUploadCopy}>
    <strong>Gambar soalan (pilihan)</strong>
    <span>Muat naik foto, rajah, graf, jadual atau imej soalan. Boleh digunakan bersama teks atau sebagai soalan bergambar sahaja.</span>
-   <small>JPG, PNG atau WebP · Maksimum 5 MB</small>
+   <small>JPG, PNG atau WebP · Maksimum 4 MB setiap imej · 4 imej / 16 MB</small>
   </div>
   <label className={styles.imageUploadButton}>
-   {form.imageFile?"Tukar gambar":"Pilih gambar soalan"}
-   <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>chooseQuestionImage(event.currentTarget.files?.[0]??null)} disabled={busy}/>
+   {form.imageItems.length?"Tambah gambar":"Pilih gambar soalan"}
+   <input ref={imageInputRef} type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={event=>{Array.from(event.currentTarget.files??[]).forEach(file=>void chooseQuestionImage(file));event.currentTarget.value="";}} disabled={busy||form.imageItems.length>=4}/>
   </label>
-  {form.imagePreviewUrl?<div className={styles.questionImageLocalPreview}>
-   <img src={form.imagePreviewUrl} alt="Pratonton gambar soalan yang dipilih"/>
-   <button type="button" className={styles.removeQuestionImageButton} disabled={busy} onClick={clearQuestionImage}>Buang gambar</button>
-  </div>:null}
- </div>{form.kind==="objective"?<>{form.options.map((v,i)=><label key={i}>Pilihan {["A","B","C","D"][i]}<input required={!form.imageFile} value={v} onChange={e=>setForm(x=>({...x,options:x.options.map((o,j)=>i===j?e.target.value:o)}))} placeholder={form.imageFile?"Sudah tertera dalam gambar — boleh dikosongkan":"Masukkan teks pilihan jawapan"}/></label>)}{form.imageFile?<p className={styles.optionEntryHint}>Pilihan A, B, C dan D boleh dikosongkan kerana sudah terdapat dalam gambar. Ruang yang dikosongkan akan dipaparkan kepada murid sebagai huruf pilihan sahaja. Pilih jawapan betul untuk pemarkahan automatik.</p>:null}<label className={styles.fullWidth}>Jawapan betul — wajib untuk pemarkahan automatik<select value={form.correct} onChange={e=>setForm({...form,correct:e.target.value})}>{["A","B","C","D"].map(x=><option key={x}>{x}</option>)}</select></label></>:<label className={styles.fullWidth}>Panduan pemarkahan guru<textarea rows={3} value={form.guide} onChange={e=>setForm({...form,guide:e.target.value})}/><small>Tidak dipaparkan kepada murid.</small></label>}<button className={styles.primaryButton} disabled={busy}>{busy?"Menyimpan...":"Tambah soalan"}</button></form></div></div></section>
+  {form.imageItems.map((item,index)=><div className={styles.questionImageLocalPreview} key={item.preview.slice(-32)}><img src={item.preview} alt={"Pratonton gambar soalan "+(index+1)}/><button type="button" className={styles.removeQuestionImageButton} disabled={busy} onClick={()=>removeQuestionImage(index)}>Buang gambar {index+1}</button></div>)}
+ </div>{form.kind==="objective"?<>{form.options.map((v,i)=><label key={i}>Pilihan {["A","B","C","D"][i]}<input required={!form.imageFile} value={v} onChange={e=>setForm(x=>({...x,options:x.options.map((o,j)=>i===j?e.target.value:o)}))} placeholder={form.imageItems.length?"Sudah tertera dalam gambar — boleh dikosongkan":"Masukkan teks pilihan jawapan"}/></label>)}{form.imageFile?<p className={styles.optionEntryHint}>Pilihan A, B, C dan D boleh dikosongkan kerana sudah terdapat dalam gambar. Ruang yang dikosongkan akan dipaparkan kepada murid sebagai huruf pilihan sahaja. Pilih jawapan betul untuk pemarkahan automatik.</p>:null}<label className={styles.fullWidth}>Jawapan betul — wajib untuk pemarkahan automatik<select value={form.correct} onChange={e=>setForm({...form,correct:e.target.value})}>{["A","B","C","D"].map(x=><option key={x}>{x}</option>)}</select></label></>:<label className={styles.fullWidth}>Panduan pemarkahan guru<textarea rows={3} value={form.guide} onChange={e=>setForm({...form,guide:e.target.value})}/><small>Tidak dipaparkan kepada murid.</small></label>}<button className={styles.primaryButton} disabled={busy}>{busy?"Menyimpan...":"Tambah soalan"}</button></form></div></div></section>
  <section className={styles.panel+" "+styles.reviewPanel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>LANGKAH 3</span><h2>Keputusan dan semakan</h2></div><button className={styles.textButton} type="button" onClick={()=>void detail()}>Muat semula</button></div>{roster.length>0?<section className={styles.markCollectionPanel}>
  <div className={styles.markCollectionHeading}><div><span className={styles.eyebrow}>RUMUSAN KELAS</span><h3>Kutipan markah setiap murid</h3><p>Senarai ini hanya memaparkan murid dalam kelas yang berada di bawah penugasan akaun guru. Markah terbaik dikira sekali bagi setiap murid.</p></div><span className={styles.markCollectionCount}>{studentSummaries.length} MURID</span></div>
  <div className={styles.markCollectionStats}>
