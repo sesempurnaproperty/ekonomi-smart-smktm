@@ -918,7 +918,7 @@ async function saveDraftResponse(
   const question = questions[0];
   if (!question) return { error: "Soalan tidak sepadan dengan percubaan ini.", status: 400 };
 
-  const answerImagePaths = Array.isArray(answerImagePathsValue) ? [...new Set(answerImagePathsValue.filter((path): path is string => typeof path === "string" && path.startsWith(String(attempt.quiz_id) + "/answers/")))] : [];
+  const answerImagePaths = Array.isArray(answerImagePathsValue) ? [...new Set(answerImagePathsValue.filter((path): path is string => typeof path === "string" && path.startsWith(String(attempt.quiz_id) + "/answers/" + attemptId + "/" + questionId + "/")))] : [];
   if (answerImagePaths.length > 4) return { error: "Maksimum empat gambar jawapan dibenarkan.", status: 400 };
   if (question.question_type === "objective" && answerImagePaths.length) return { error: "Gambar jawapan hanya dibenarkan untuk soalan struktur.", status: 400 };
   if (question.question_type === "objective") {
@@ -1006,7 +1006,7 @@ async function submitAttempt(
     } else {
       structuredCount += 1;
       const responseText = typeof answer.response_text === "string" ? answer.response_text.trim().slice(0, 12000) : "";
-      const answerImagePaths = Array.isArray(answer.answer_image_paths) ? [...new Set(answer.answer_image_paths.filter((path): path is string => typeof path === "string" && path.startsWith(String(attempt.quiz_id) + "/answers/")))] : [];
+      const answerImagePaths = Array.isArray(answer.answer_image_paths) ? [...new Set(answer.answer_image_paths.filter((path): path is string => typeof path === "string" && path.startsWith(String(attempt.quiz_id) + "/answers/" + attemptId + "/" + qid + "/")))] : [];
       if (answerImagePaths.length > 4) return { error: "Maksimum empat gambar jawapan dibenarkan.", status: 400 };
       responses.push({
         attempt_id: attemptId,
@@ -1064,7 +1064,7 @@ async function uploadQuizQuestionImage(
     if (!targetQuestions.length || targetQuestions[0].question_type !== "structured") return { error: "Gambar jawapan hanya dibenarkan untuk soalan struktur.", status: 400 };
     const existing = await getRows(supabaseUrl, secretKey, "quiz_responses", { select: "answer_image_paths", attempt_id: "eq." + input.attempt_id, question_id: "eq." + input.question_id, limit: "1" });
     if ((existing[0]?.answer_image_paths ?? []).length >= 4) return { error: "Maksimum empat gambar jawapan dibenarkan.", status: 409 };
-    storagePrefix = "answers/";
+    storagePrefix = "answers/" + input.attempt_id + "/" + input.question_id + "/";
   } else {
     const access = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
     if (!access.quiz) return { error: access.error ?? "Akses kuiz ditolak.", status: access.status ?? 403 };
