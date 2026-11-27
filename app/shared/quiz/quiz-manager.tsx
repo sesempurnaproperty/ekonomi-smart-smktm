@@ -136,6 +136,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    ...attempt,
    responses:attempt.responses.map(response=>({
     ...response,
+    answer_image_urls:(response.answer_image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url)),
     question:response.question?{
      ...response.question,
      image_url:response.question.image_path?signedMap.get(response.question.image_path)??null:null,
@@ -572,6 +573,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  ref={node=>{answerRefs.current[r.id]=node;}}
  className={styles.studentAnswer+" "+styles.teacherSelectableAnswer}
  onMouseUp={()=>captureSelection(r.id)}
+ onTouchEnd={()=>{window.setTimeout(()=>captureSelection(r.id),80);}}
+ onPointerUp={()=>captureSelection(r.id)}
  onKeyUp={()=>captureSelection(r.id)}
  tabIndex={0}
  aria-label="Pilih perkataan dalam jawapan murid untuk menanda pemarkahan"
@@ -581,7 +584,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    <strong>Tanda pemarkahan pada jawapan</strong>
    <span>Pilih perkataan atau frasa di atas, kemudian pilih simbol.</span>
   </div>
-  {selectedRanges[r.id]?<div className={styles.selectedPhrase}>Dipilih: “{selectedRanges[r.id].text}”</div>:<div className={styles.selectionHint}>Tiada teks dipilih. Seret tetikus pada perkataan yang membawa markah atau kesalahan.</div>}
+  {selectedRanges[r.id]?<div className={styles.selectedPhrase}>Dipilih: “{selectedRanges[r.id].text}”</div>:<div className={styles.selectionHint}>Tiada teks dipilih. PC: seret tetikus. Telefon: tekan lama pada teks dan laraskan pemilih.</div>}
   <div className={styles.markingToolButtons}>
    {MARK_TYPES.map(mark=><button key={mark.type} type="button" className={styles.markingToolButton+" "+styles["markingTool"+mark.type]} disabled={!selectedRanges[r.id]||busy} title={mark.label} onClick={()=>addAnnotation(r.id,mark.type)}>
     <strong>{mark.symbol}</strong><span>{mark.label}</span>
