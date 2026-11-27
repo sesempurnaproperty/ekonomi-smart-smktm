@@ -997,8 +997,22 @@ async function uploadQuizQuestionImage(
   callerId: string,
   input: JsonRecord
 ) {
-  const access = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
-  if (!access.quiz) return { error: access.error ?? "Akses kuiz ditolak.", status: access.status ?? 403 };
+  const category = input.category === "answer" || input.category === "guide" ? input.category : "question";
+  let storagePrefix = "";
+  if (category === "answer") {
+    if (profile.role !== "student" || typeof input.attempt_id !== "string" || typeof input.question_id !== "string") return { error: "Akses muat naik jawapan ditolak.", status: 403 };
+    const ownedAttempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", { select: "id,quiz_id,status", id: "eq." + input.attempt_id, quiz_id: "eq." + quizId, student_id: "eq." + callerId, status: "eq.in_progress", limit: "1" });
+    if (!ownedAttempts.length) return { error: "Percubaan aktif tidak ditemui.", status: 403 };
+    const targetQuestions = await getRows(supabaseUrl, secretKey, "quiz_questions", { select: "id,question_type", id: "eq." + input.question_id, quiz_id: "eq." + quizId, limit: "1" });
+    if (!targetQuestions.length || targetQuestions[0].question_type !== "structured") return { error: "Gambar jawapan hanya dibenarkan untuk soalan struktur.", status: 400 };
+    const existing = await getRows(supabaseUrl, secretKey, "quiz_responses", { select: "answer_image_paths", attempt_id: "eq." + input.attempt_id, question_id: "eq." + input.question_id, limit: "1" });
+    if ((existing[0]?.answer_image_paths ?? []).length >= 4) return { error: "Maksimum empat gambar jawapan dibenarkan.", status: 409 };
+    storagePrefix = "answers/";
+  } else {
+    const access = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
+    if (!access.quiz) return { error: access.error ?? "Akses kuiz ditolak.", status: access.status ?? 403 };
+    storagePrefix = category === "guide" ? "guide/" : "";
+  }
 
   const mimeType = typeof input.mime_type === "string" ? input.mime_type : "";
   const extensionByType: Record<string, string> = {
@@ -1026,7 +1040,7 @@ async function uploadQuizQuestionImage(
     return { error: "Saiz gambar mesti antara 1 bait hingga 4 MB.", status: 413 };
   }
 
-  const path = quizId + "/" + crypto.randomUUID() + "." + extension;
+  const path = quizId + "/" + storagePrefix + crypto.randomUUID() + "." + extension;
   const uploadUrl = new URL(
     "/storage/v1/object/quiz-question-images/" + path.split("/").map(encodeURIComponent).join("/"),
     supabaseUrl
