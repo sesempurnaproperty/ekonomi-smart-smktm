@@ -567,6 +567,7 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
                     ))}
                   </div>
                 ) : (
+                  <>
                   <label className={styles.fullWidth}>Jawapan anda
                     <textarea rows={5} value={answers[question.id]?.response_text ?? ""} onChange={(event) => write(question.id, event.target.value)} onBlur={() => saveTextDraft(question.id)} placeholder="Tulis jawapan anda di sini..." />
                   </label>
@@ -578,6 +579,7 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
                     </label>
                     {(answers[question.id]?.answer_images??[]).map((item,index)=><div className={styles.questionImageLocalPreview} key={item.path??item.preview.slice(-30)}>{item.preview?<img src={item.preview} alt={"Pratonton jawapan "+(index+1)}/>:<span>Gambar telah disimpan</span>}<button type="button" className={styles.removeQuestionImageButton} disabled={busy} onClick={()=>removeAnswerImage(question.id,index)}>Buang gambar {index+1}</button></div>)}
                   </div>
+                  </>
                 )}
               </article>
             ))}
