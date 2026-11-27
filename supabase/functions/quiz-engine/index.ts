@@ -248,7 +248,7 @@ async function signQuestionImagePaths(
     });
     let permittedStudentIds = new Set(attempts.map((attempt) => String(attempt.student_id)));
     if (profile.role === "teacher") {
-      const assignedClassIds = new Set(access.assignedClassIds ?? []);
+      const assignedClassIds = new Set(access?.assignedClassIds ?? []);
       const studentIds = [...permittedStudentIds];
       const students = studentIds.length ? await getRows(supabaseUrl, secretKey, "user_profiles", {
         select: "user_id,academic_class_id,role",
