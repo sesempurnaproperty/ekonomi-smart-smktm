@@ -8,11 +8,11 @@ type Quiz={id:string;title:string;description:string|null;target_form_level:numb
 type Chapter={id:string;form_level:number;chapter_number:number;title:string};
 type SyllabusChapter={id:string;chapter_number:number;title:string;display_order:number};
 type SyllabusTopic={id:string;chapter_id:string;topic_code:string;title:string;display_order:number};
-type Question={id:string;quiz_id:string;question_order:number;question_type:"objective"|"structured";prompt:string;marks:number;image_path:string|null;image_url?:string|null;syllabus_topic_id:string};
+type Question={id:string;quiz_id:string;question_order:number;question_type:"objective"|"structured";prompt:string;marks:number;image_path:string|null;image_paths?:string[];image_url?:string|null;image_urls?:string[];marking_guide_image_paths?:string[];marking_guide_image_urls?:string[];syllabus_topic_id:string};
 type Option={id:string;question_id:string;option_code:string;option_text:string;option_order:number};
 type MarkType="right"|"wrong"|"tr"|"repeat";
 type MarkAnnotation={id:string;start:number;end:number;text:string;type:MarkType;comment?:string};
-type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;auto_score:number|null;teacher_score:number|null;feedback:string|null;marking_annotations?:MarkAnnotation[]|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null;image_path:string|null;image_url?:string|null;syllabus_topic_id:string}|null};
+type R={id:string;question_id:string;selected_option_id:string|null;response_text:string|null;answer_image_paths?:string[];answer_image_urls?:string[];auto_score:number|null;teacher_score:number|null;feedback:string|null;marking_annotations?:MarkAnnotation[]|null;selected_option:{option_code:string;option_text:string}|null;question:{question_type:string;prompt:string;marks:number;question_order:number;marking_guide?:string|null;image_path:string|null;image_paths?:string[];image_url?:string|null;image_urls?:string[];marking_guide_image_paths?:string[];marking_guide_image_urls?:string[];syllabus_topic_id:string}|null};
 const MARK_TYPES:{type:MarkType;symbol:string;label:string}[]=[
  {type:"right",symbol:"✓",label:"Mengandungi markah"},
  {type:"wrong",symbol:"✗",label:"Jawapan salah"},
@@ -35,7 +35,7 @@ function renderMarkedAnswer(text:string,annotations:MarkAnnotation[]|null|undefi
 }
 type A={id:string;student_id:string;attempt_number:number;status:string;total_score:number;max_score:number;student:{full_name:string;form_level:number;class_name:string}|null;responses:R[]};
 type StudentRoster={user_id:string;full_name:string;form_level:number;class_name:string;academic_class_id:string};
-const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:"",syllabusTopicId:"",imageFile:null as {type:string;size:number}|null,imageBase64:"",imagePreviewUrl:""};
+const fresh={kind:"objective" as "objective"|"structured",prompt:"",marks:"1",options:["","","",""],correct:"A",guide:"",syllabusTopicId:"",imageFile:null as {type:string;size:number}|null,imageBase64:"",imagePreviewUrl:"",imageItems:[] as {type:string;size:number;base64:string;preview:string}[],guideItems:[] as {type:string;size:number;base64:string;preview:string}[]};
 function getMobileMenuItems(roleLabel: string) {
   if (roleLabel === "PENTADBIR") return [
     {label:"Dashboard pentadbir",href:"/admin/dashboard"},
@@ -68,6 +68,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  const answerRefs=useRef<Record<string,HTMLDivElement|null>>({});
  const reviewPanelRef=useRef<HTMLDivElement|null>(null);
  const imageInputRef=useRef<HTMLInputElement|null>(null);
+ const guideImageInputRef=useRef<HTMLInputElement|null>(null);
  const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [notice,setNotice]=useState("");
  const refresh=useCallback(async()=>{
   setLoading(true);
@@ -110,8 +111,9 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   const qs=(q.data??[]) as Question[];
   const arsRaw=(a.data?.attempts??[]) as A[];
   const imagePaths=[...new Set([
-   ...qs.map(item=>item.image_path),
-   ...arsRaw.flatMap(attempt=>attempt.responses.map(response=>response.question?.image_path??null))
+   ...qs.flatMap(item=>[item.image_path,...(item.image_paths??[])]),
+   ...arsRaw.flatMap(attempt=>attempt.responses.flatMap(response=>(response.question?.marking_guide_image_paths??[]))),
+   ...arsRaw.flatMap(attempt=>attempt.responses.flatMap(response=>[response.question?.image_path??null,...(response.question?.image_paths??[]),...(response.answer_image_paths??[])]))
   ].filter((path):path is string=>typeof path==="string"&&path.length>0))];
   const signedResult=imagePaths.length
    ? await s.functions.invoke("quiz-engine",{body:{action:"sign_question_images",quiz_id:quizId,image_paths:imagePaths}})
@@ -123,7 +125,9 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   const signedMap=new Map<string,string>((signedResult.data?.image_urls??[]).map((entry:{path:string;url:string})=>[entry.path,entry.url]));
   const withImage=(question:Question):Question=>({
    ...question,
-   image_url:question.image_path?signedMap.get(question.image_path)??null:null
+   image_url:question.image_path?signedMap.get(question.image_path)??null:null,
+   image_urls:(question.image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url)),
+   marking_guide_image_urls:(question.marking_guide_image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url))
   });
   setQuestions(qs.map(withImage));
   const ids=new Set(qs.map(question=>question.id));
@@ -134,7 +138,9 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     ...response,
     question:response.question?{
      ...response.question,
-     image_url:response.question.image_path?signedMap.get(response.question.image_path)??null:null
+     image_url:response.question.image_path?signedMap.get(response.question.image_path)??null:null,
+     image_urls:(response.question.image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url)),
+     marking_guide_image_urls:(response.question.marking_guide_image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url))
     }:null
    }))
   }));
@@ -198,8 +204,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     total.questions+=1;
     totals.set(topicId,total);
    });
-  });
-  return syllabusTopics.map(topic=>{
+  });  return syllabusTopics.map(topic=>{
    const total=totals.get(topic.id);
    const maximum=total?.maximum??0;
    const earned=total?.earned??0;
@@ -233,6 +238,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  }
  async function chooseQuestionImage(file:File|null){
   if(!file)return;
+  if(form.imageItems.length>=4){setError("Maksimum empat gambar soalan dibenarkan.");if(imageInputRef.current)imageInputRef.current.value="";return;}
   const allowed=["image/jpeg","image/png","image/webp"];
   if(!allowed.includes(file.type)){
    setError("Format gambar tidak disokong. Gunakan JPG, PNG atau WebP.");
@@ -244,64 +250,101 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    if(imageInputRef.current)imageInputRef.current.value="";
    return;
   }
-  // Read the selected file immediately while the Android document-provider
-  // grant is active. Do not retain a File handle for a later async read.
-  const reader=new FileReader();
-  reader.onload=()=>{
-   const dataUrl=typeof reader.result==="string"?reader.result:"";
-   const comma=dataUrl.indexOf(",");
-   if(comma<0){
-    setError("Fail gambar tidak dapat dibaca. Sila pilih gambar semula.");
-    if(imageInputRef.current)imageInputRef.current.value="";
-    return;
+  setError("");
+  try{
+   // Read the file immediately after selection. Use the File API first,
+   // then fall back to FileReader for browsers/document providers that do
+   // not implement arrayBuffer() reliably (including some Android pickers).
+   let dataUrl="";
+   try{
+    if(typeof file.arrayBuffer==="function"){
+     const buffer=await file.arrayBuffer();
+     const bytes=new Uint8Array(buffer);
+     let binary="";
+     const chunkSize=0x8000;
+     for(let offset=0;offset<bytes.length;offset+=chunkSize){
+      binary+=String.fromCharCode(...bytes.subarray(offset,Math.min(offset+chunkSize,bytes.length)));
+     }
+     dataUrl="data:"+file.type+";base64,"+btoa(binary);
+    }
+   }catch{
+    dataUrl="";
    }
-   setForm(current=>({...current,imageFile:{type:file.type,size:file.size},imageBase64:dataUrl.slice(comma+1),imagePreviewUrl:dataUrl}));
-   setError("");
-  };
-  reader.onerror=()=>{
-   setError("Telefon tidak dapat membaca fail gambar. Cuba pilih gambar daripada Galeri telefon.");
+   if(!dataUrl){
+    dataUrl=await new Promise<string>((resolve,reject)=>{
+     const reader=new FileReader();
+     reader.onload=()=>typeof reader.result==="string"?resolve(reader.result):reject(new Error("Bacaan fail tidak menghasilkan data imej."));
+     reader.onerror=()=>reject(new Error("Pelayar tidak dapat membaca fail yang dipilih."));
+     reader.onabort=()=>reject(new Error("Bacaan fail dibatalkan."));
+     reader.readAsDataURL(file);
+    });
+   }
+   const comma=dataUrl.indexOf(",");
+   if(comma<0)throw new Error("Fail gambar tidak dapat dibaca. Sila pilih gambar semula.");
+   setForm(current=>({...current,imageFile:{type:file.type,size:file.size},imageBase64:dataUrl.slice(comma+1),imagePreviewUrl:dataUrl,imageItems:[...current.imageItems,{type:file.type,size:file.size,base64:dataUrl.slice(comma+1),preview:dataUrl}]}));
+  }catch(cause){
+   setForm(current=>({...current,imageFile:null,imageBase64:"",imagePreviewUrl:""}));
    if(imageInputRef.current)imageInputRef.current.value="";
-  };
-  reader.readAsDataURL(file);
+   setError(cause instanceof Error?"Gagal membaca gambar: "+cause.message:"Gagal membaca fail gambar. Cuba pilih semula melalui Galeri atau folder komputer.");
+  }
  }
 
  function clearQuestionImage(){
-  setForm(current=>({...current,imageFile:null,imageBase64:"",imagePreviewUrl:""}));
+  setForm(current=>({...current,imageFile:null,imageBase64:"",imagePreviewUrl:"",imageItems:[]}));
   if(imageInputRef.current)imageInputRef.current.value="";
  }
 
+ function removeQuestionImage(index:number){setForm(current=>{const imageItems=current.imageItems.filter((_,i)=>i!==index);const first=imageItems[0];return {...current,imageItems,imageFile:first?{type:first.type,size:first.size}:null,imageBase64:first?.base64??"",imagePreviewUrl:first?.preview??""};});}
+
+ async function chooseGuideImage(file:File|null){
+  if(!file)return;
+  if(form.guideItems.length>=4){setError("Maksimum empat gambar panduan pemarkahan dibenarkan.");if(guideImageInputRef.current)guideImageInputRef.current.value="";return;}
+  if(!["image/jpeg","image/png","image/webp"].includes(file.type)){setError("Format gambar tidak disokong. Gunakan JPG, PNG atau WebP.");return;}
+  if(file.size>4*1024*1024){setError("Saiz setiap gambar maksimum 4 MB.");return;}
+  try{
+   const dataUrl=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>typeof reader.result==="string"?resolve(reader.result):reject(new Error("Fail tidak dapat dibaca."));reader.onerror=()=>reject(new Error("Pelayar tidak dapat membaca fail."));reader.readAsDataURL(file);});
+   const comma=dataUrl.indexOf(",");
+   setForm(current=>({...current,guideItems:[...current.guideItems,{type:file.type,size:file.size,base64:dataUrl.slice(comma+1),preview:dataUrl}]}));
+   setError("");
+  }catch(err){setError(err instanceof Error?err.message:"Gambar panduan gagal dibaca.");}
+ }
+ function removeGuideImage(index:number){setForm(current=>({...current,guideItems:current.guideItems.filter((_,i)=>i!==index)}));}
  async function addQuestion(e:FormEvent){
   e.preventDefault();
   if(!form.syllabusTopicId){
    setError("Pilih Bab kecil / subbab silibus untuk soalan ini.");
    return;
   }
-  if(!form.prompt.trim()&&!form.imageFile){
+  if(!form.prompt.trim()&&!form.imageItems.length){
    setError("Taip pernyataan soalan atau muat naik gambar soalan.");
    return;
   }
-  if(form.kind==="objective"&&!form.imageFile&&form.options.some(value=>!value.trim())){
+  if(form.kind==="objective"&&!form.imageItems.length&&form.options.some(value=>!value.trim())){
    setError("Lengkapkan pilihan A, B, C dan D, atau muat naik gambar yang sudah mengandungi pilihan jawapan.");
    return;
   }
   setBusy(true);setError("");setNotice("");
   let imagePath:string|null=null;
+  const imagePaths:string[]=[];
+  const guideImagePaths:string[]=[];
   let createdQuestionId:string|null=null;
   try{
-   if(form.imageFile){
-    if(form.imageFile.size>4*1024*1024)throw new Error("Saiz gambar maksimum ialah 4 MB. Sila kecilkan gambar dan cuba semula.");
-    const imageBase64=form.imageBase64;
-    if(!imageBase64)throw new Error("Data gambar belum tersedia. Sila pilih semula gambar.");
-    const {data:uploaded,error:uploadError}=await s.functions.invoke("quiz-engine",{body:{
-     action:"upload_question_image",
-     quiz_id:quizId,
-     mime_type:form.imageFile.type,
-     image_base64:imageBase64
-    }});
+   if(form.imageItems.length>4||form.imageItems.reduce((sum,item)=>sum+item.size,0)>16*1024*1024||form.guideItems.length>4||form.guideItems.reduce((sum,item)=>sum+item.size,0)>16*1024*1024)throw new Error("Had maksimum empat gambar dan 16 MB bagi setiap bahagian.");
+   for(const item of form.imageItems){
+    if(item.size>4*1024*1024)throw new Error("Saiz setiap gambar maksimum 4 MB.");
+    const {data:uploaded,error:uploadError}=await s.functions.invoke("quiz-engine",{body:{action:"upload_question_image",quiz_id:quizId,mime_type:item.type,image_base64:item.base64,category:"question"}});
     if(uploadError||uploaded?.error)throw new Error("Muat naik gambar gagal: "+(uploadError?.message??uploaded?.error??"Ralat tidak diketahui."));
     if(typeof uploaded?.image_path!=="string"||!uploaded.image_path.startsWith(quizId+"/"))throw new Error("Pelayan tidak memulangkan laluan gambar yang sah.");
-    imagePath=uploaded.image_path;
+    imagePaths.push(uploaded.image_path);
    }
+   for(const item of form.guideItems){
+    if(item.size>4*1024*1024)throw new Error("Saiz setiap gambar panduan maksimum 4 MB.");
+    const {data:uploaded,error:uploadError}=await s.functions.invoke("quiz-engine",{body:{action:"upload_question_image",quiz_id:quizId,mime_type:item.type,image_base64:item.base64,category:"guide"}});
+    if(uploadError||uploaded?.error)throw new Error("Muat naik gambar panduan gagal: "+(uploadError?.message??uploaded?.error??"Ralat tidak diketahui."));
+    if(typeof uploaded?.image_path!=="string"||!uploaded.image_path.startsWith(quizId+"/guide/"))throw new Error("Laluan gambar panduan tidak sah.");
+    guideImagePaths.push(uploaded.image_path);
+   }
+   imagePath=imagePaths[0]??null;
 
    const {data:created,error:createError}=await s.functions.invoke("quiz-engine",{body:{
     action:"create_question",
@@ -310,10 +353,12 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     prompt:form.prompt.trim()||(imagePath?"Lihat gambar soalan":""),
     marks:Number(form.marks),
     image_path:imagePath,
+    image_paths:imagePaths,
     syllabus_topic_id:form.syllabusTopicId,
     options:form.kind==="objective"?form.options.map(value=>value.trim()):[],
     correct_option_code:form.kind==="objective"?form.correct:null,
-    marking_guide:form.kind==="structured"?form.guide.trim():null
+    marking_guide:form.kind==="structured"?form.guide.trim():null,
+    marking_guide_image_paths:form.kind==="structured"?guideImagePaths:[]
    }});
    if(createError||created?.error)throw new Error("Penyimpanan soalan gagal: "+(createError?.message??created?.error??"Ralat tidak diketahui."));
    createdQuestionId=created.question?.id??null;
@@ -326,8 +371,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    if(createdQuestionId){
     await s.from("quiz_questions").delete().eq("id",createdQuestionId);
    }
-   if(imagePath){
-    await s.storage.from("quiz-question-images").remove([imagePath]);
+   if(imagePaths.length){
+    await s.storage.from("quiz-question-images").remove(imagePaths);
    }
    setError(cause instanceof Error?cause.message:"Soalan gagal disimpan.");
   }finally{
@@ -339,9 +384,11 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  async function resetAttempts(){
   if(!selected)return;
   const scopeText=roleLabel==="GURU"?"percubaan murid daripada kelas yang ditugaskan kepada akaun anda":"semua percubaan murid";
-  const ok=window.confirm(
-   "RESET PERCOBAAN KUIZ?\n\nTindakan ini akan memadam "+scopeText+", termasuk jawapan, markah dan ulasan guru. Kuiz akan ditarik balik dan perlu diterbitkan semula. Tindakan ini tidak boleh dibatalkan. Teruskan?"
-  );
+  const ok=window.confirm([
+   "RESET PERCOBAAN KUIZ?",
+   "",
+   "Tindakan ini akan memadam "+scopeText+", termasuk jawapan, markah dan ulasan guru. Kuiz akan ditarik balik dan perlu diterbitkan semula. Tindakan ini tidak boleh dibatalkan. Teruskan?"
+  ].join("\n"));
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"reset_quiz_attempts",quiz_id:selected.id}});
@@ -354,9 +401,11 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
 
  async function removeQuiz(){
   if(!selected)return;
-  const ok=window.confirm(
-   "PADAM KESELURUHAN KUIZ?\n\nKuiz '"+selected.title+"' akan dipadam bersama semua soalan, pilihan jawapan, kunci jawapan, jawapan murid, markah dan sejarah percubaan yang berkaitan. Tindakan ini kekal dan tidak boleh dibatalkan. Teruskan?"
-  );
+  const ok=window.confirm([
+   "PADAM KESELURUHAN KUIZ?",
+   "",
+   "Kuiz '"+selected.title+"' akan dipadam bersama semua soalan, pilihan jawapan, kunci jawapan, jawapan murid, markah dan sejarah percubaan yang berkaitan. Tindakan ini kekal dan tidak boleh dibatalkan. Teruskan?"
+  ].join("\n"));
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"delete_quiz",quiz_id:selected.id}});
@@ -369,13 +418,12 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
 
  async function removeQuestion(question:Question){
   const ok=window.confirm(
-   "PADAM SOALAN "+question.question_order+"?\n\nSoalan ini serta pilihan jawapan dan kunci jawapannya akan dipadam. Kuiz mesti berstatus draf. Semua percubaan murid yang berkaitan perlu direset terlebih dahulu supaya rekod jawapan dan markah tidak terjejas secara senyap. Jika masih ada percubaan, sistem akan memaklumkan sebab sebenar dan jumlah yang masih berbaki. Teruskan?"
+   `PADAM SOALAN ${question.question_order}?\n\nSoalan ini serta pilihan jawapan dan kunci jawapannya akan dipadam. Kuiz mesti berstatus draf. Semua percubaan murid yang berkaitan perlu direset terlebih dahulu supaya rekod jawapan dan markah tidak terjejas secara senyap. Jika masih ada percubaan, sistem akan memaklumkan sebab sebenar dan jumlah yang masih berbaki. Teruskan?`
   );
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{
-   action:"delete_question",quiz_id:quizId,question_id:question.id
-  }});
+   action:"delete_question",quiz_id:quizId,question_id:question.id  }});
   setBusy(false);
   if(err){
    let message=err.message||"Soalan gagal dipadam.";
@@ -459,7 +507,7 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   : null}
  <button className={styles.deleteButton} type="button" disabled={busy} onClick={()=>void removeQuiz()}>Padam kuiz</button>
 </div></div>
- <div className={styles.questionLayout}><div><h3>Soalan ({questions.length})</h3>{questions.length===0?<p className={styles.emptyText}>Tambahkan soalan untuk membina kuiz.</p>:questions.map(q=><article className={styles.questionCard} key={q.id}><div className={styles.questionMeta}><span>SOALAN {q.question_order}</span><span>{q.question_type==="objective"?"OBJEKTIF":"STRUKTUR"}</span><span>{q.marks} markah</span></div><div className={styles.questionSyllabusTag}>{syllabusTopics.find(topic=>topic.id===q.syllabus_topic_id)?.topic_code} · {syllabusTopics.find(topic=>topic.id===q.syllabus_topic_id)?.title??"Subbab tidak ditemui"}</div>{q.image_url?<img className={styles.questionImagePreview} src={q.image_url} alt={"Gambar soalan "+q.question_order}/>:null}{q.prompt!=="Lihat gambar soalan"?<p>{q.prompt}</p>:null}{q.question_type==="objective"?<ol className={styles.optionList} type="A">{options.filter(o=>o.question_id===q.id).map(o=><li key={o.id}>{o.option_text||"Pilihan terdapat dalam gambar"}</li>)}</ol>:<small>Jawapan struktur — ditanda secara manual.</small>}
+ <div className={styles.questionLayout}><div><h3>Soalan ({questions.length})</h3>{questions.length===0?<p className={styles.emptyText}>Tambahkan soalan untuk membina kuiz.</p>:questions.map(q=><article className={styles.questionCard} key={q.id}><div className={styles.questionMeta}><span>SOALAN {q.question_order}</span><span>{q.question_type==="objective"?"OBJEKTIF":"STRUKTUR"}</span><span>{q.marks} markah</span></div><div className={styles.questionSyllabusTag}>{syllabusTopics.find(topic=>topic.id===q.syllabus_topic_id)?.topic_code} · {syllabusTopics.find(topic=>topic.id===q.syllabus_topic_id)?.title??"Subbab tidak ditemui"}</div>{(q.image_urls?.length?q.image_urls:q.image_url?[q.image_url]:[]).map((url,index)=><img key={url} className={styles.questionImagePreview} src={url} alt={"Gambar soalan "+q.question_order+"-"+(index+1)}/>)}{q.prompt!=="Lihat gambar soalan"?<p>{q.prompt}</p>:null}{q.question_type==="objective"?<ol className={styles.optionList} type="A">{options.filter(o=>o.question_id===q.id).map(o=><li key={o.id}>{o.option_text||"Pilihan terdapat dalam gambar"}</li>)}</ol>:<small>Jawapan struktur — ditanda secara manual.</small>}
  <div className={styles.questionCardActions}>
   <span>{selected.status==="published"?"Kuiz diterbitkan — soalan baharu boleh ditambah.":attempts.length>0?"Reset percubaan sebelum memadam soalan.":"Soalan boleh dipadam."}</span>
   <button className={styles.questionDeleteButton} type="button" disabled={busy||selected.status==="published"} onClick={()=>void removeQuestion(q)}>Padam soalan</button>
@@ -470,22 +518,19 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   <option value="">Pilih subbab bagi soalan ini</option>
   {syllabusTopics.filter(topic=>!selected?.syllabus_chapter_id||topic.chapter_id===selected.syllabus_chapter_id).map(topic=><option key={topic.id} value={topic.id}>{topic.topic_code} · {topic.title}</option>)}
  </select></label>
- <label className={styles.fullWidth}>Pernyataan / arahan soalan (pilihan jika menggunakan gambar)<textarea rows={3} required={!form.imageFile} value={form.prompt} onChange={e=>setForm({...form,prompt:e.target.value})} placeholder="Taip soalan di sini, atau muat naik gambar soalan di bawah..."/></label>
+ <label className={styles.fullWidth}>Pernyataan / arahan soalan (pilihan jika menggunakan gambar)<textarea rows={3} required={!form.imageItems.length} value={form.prompt} onChange={e=>setForm({...form,prompt:e.target.value})} placeholder="Taip soalan di sini, atau muat naik gambar soalan di bawah..."/></label>
  <div className={styles.questionImageUploader}>
   <div className={styles.questionImageUploadCopy}>
    <strong>Gambar soalan (pilihan)</strong>
    <span>Muat naik foto, rajah, graf, jadual atau imej soalan. Boleh digunakan bersama teks atau sebagai soalan bergambar sahaja.</span>
-   <small>JPG, PNG atau WebP · Maksimum 5 MB</small>
+   <small>JPG, PNG atau WebP · Maksimum 4 MB setiap imej · 4 imej / 16 MB</small>
   </div>
   <label className={styles.imageUploadButton}>
-   {form.imageFile?"Tukar gambar":"Pilih gambar soalan"}
-   <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>chooseQuestionImage(event.currentTarget.files?.[0]??null)} disabled={busy}/>
+   {form.imageItems.length?"Tambah gambar":"Pilih gambar soalan"}
+   <input ref={imageInputRef} type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={event=>{Array.from(event.currentTarget.files??[]).forEach(file=>void chooseQuestionImage(file));event.currentTarget.value="";}} disabled={busy||form.imageItems.length>=4}/>
   </label>
-  {form.imagePreviewUrl?<div className={styles.questionImageLocalPreview}>
-   <img src={form.imagePreviewUrl} alt="Pratonton gambar soalan yang dipilih"/>
-   <button type="button" className={styles.removeQuestionImageButton} disabled={busy} onClick={clearQuestionImage}>Buang gambar</button>
-  </div>:null}
- </div>{form.kind==="objective"?<>{form.options.map((v,i)=><label key={i}>Pilihan {["A","B","C","D"][i]}<input required={!form.imageFile} value={v} onChange={e=>setForm(x=>({...x,options:x.options.map((o,j)=>i===j?e.target.value:o)}))} placeholder={form.imageFile?"Sudah tertera dalam gambar — boleh dikosongkan":"Masukkan teks pilihan jawapan"}/></label>)}{form.imageFile?<p className={styles.optionEntryHint}>Pilihan A, B, C dan D boleh dikosongkan kerana sudah terdapat dalam gambar. Ruang yang dikosongkan akan dipaparkan kepada murid sebagai huruf pilihan sahaja. Pilih jawapan betul untuk pemarkahan automatik.</p>:null}<label className={styles.fullWidth}>Jawapan betul — wajib untuk pemarkahan automatik<select value={form.correct} onChange={e=>setForm({...form,correct:e.target.value})}>{["A","B","C","D"].map(x=><option key={x}>{x}</option>)}</select></label></>:<label className={styles.fullWidth}>Panduan pemarkahan guru<textarea rows={3} value={form.guide} onChange={e=>setForm({...form,guide:e.target.value})}/><small>Tidak dipaparkan kepada murid.</small></label>}<button className={styles.primaryButton} disabled={busy}>{busy?"Menyimpan...":"Tambah soalan"}</button></form></div></div></section>
+  {form.imageItems.map((item,index)=><div className={styles.questionImageLocalPreview} key={item.preview.slice(-32)}><img src={item.preview} alt={"Pratonton gambar soalan "+(index+1)}/><button type="button" className={styles.removeQuestionImageButton} disabled={busy} onClick={()=>removeQuestionImage(index)}>Buang gambar {index+1}</button></div>)}
+ </div>{form.kind==="objective"?<>{form.options.map((v,i)=><label key={i}>Pilihan {["A","B","C","D"][i]}<input required={!form.imageFile} value={v} onChange={e=>setForm(x=>({...x,options:x.options.map((o,j)=>i===j?e.target.value:o)}))} placeholder={form.imageItems.length?"Sudah tertera dalam gambar — boleh dikosongkan":"Masukkan teks pilihan jawapan"}/></label>)}{form.imageFile?<p className={styles.optionEntryHint}>Pilihan A, B, C dan D boleh dikosongkan kerana sudah terdapat dalam gambar. Ruang yang dikosongkan akan dipaparkan kepada murid sebagai huruf pilihan sahaja. Pilih jawapan betul untuk pemarkahan automatik.</p>:null}<label className={styles.fullWidth}>Jawapan betul — wajib untuk pemarkahan automatik<select value={form.correct} onChange={e=>setForm({...form,correct:e.target.value})}>{["A","B","C","D"].map(x=><option key={x}>{x}</option>)}</select></label></>:<><label className={styles.fullWidth}>Panduan pemarkahan guru<textarea rows={3} value={form.guide} onChange={e=>setForm({...form,guide:e.target.value})}/><small>Tidak dipaparkan kepada murid.</small></label><div className={styles.questionImageUploader}><div className={styles.questionImageUploadCopy}><strong>Gambar panduan pemarkahan (guru sahaja)</strong><span>Boleh gabungkan teks dan gambar. Murid tidak akan menerima imej panduan ini.</span><small>JPG, PNG atau WebP · Maksimum 4 MB setiap imej · 4 imej / 16 MB</small></div><label className={styles.imageUploadButton}>Pilih gambar panduan<input ref={guideImageInputRef} type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={event=>{Array.from(event.currentTarget.files??[]).forEach(file=>void chooseGuideImage(file));event.currentTarget.value="";}} disabled={busy||form.guideItems.length>=4}/></label>{form.guideItems.map((item,index)=><div className={styles.questionImageLocalPreview} key={item.preview.slice(-32)}><img src={item.preview} alt={"Pratonton panduan "+(index+1)}/><button type="button" className={styles.removeQuestionImageButton} disabled={busy} onClick={()=>removeGuideImage(index)}>Buang gambar panduan {index+1}</button></div>)}</div></>}<button className={styles.primaryButton} disabled={busy}>{busy?"Menyimpan...":"Tambah soalan"}</button></form></div></div></section>
  <section className={styles.panel+" "+styles.reviewPanel}><div className={styles.panelHeading}><div><span className={styles.eyebrow}>LANGKAH 3</span><h2>Keputusan dan semakan</h2></div><button className={styles.textButton} type="button" onClick={()=>void detail()}>Muat semula</button></div>{roster.length>0?<section className={styles.markCollectionPanel}>
  <div className={styles.markCollectionHeading}><div><span className={styles.eyebrow}>RUMUSAN KELAS</span><h3>Kutipan markah setiap murid</h3><p>Senarai ini hanya memaparkan murid dalam kelas yang berada di bawah penugasan akaun guru. Markah terbaik dikira sekali bagi setiap murid.</p></div><span className={styles.markCollectionCount}>{studentSummaries.length} MURID</span></div>
  <div className={styles.markCollectionStats}>
@@ -518,19 +563,19 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    <td>{item.rows.length}/{selected?.attempt_limit??"—"}</td>
    <td><strong className={styles.markCollectionScore}>{item.best?Number(item.best.total_score)+"/"+Number(item.best.max_score):"—"}</strong></td>
    <td><span className={item.latest?.status==="graded"?styles.scoreStatusDone:item.latest?.status==="pending_review"?styles.scoreStatusPending:item.latest?.status==="in_progress"?styles.scoreStatusProgress:styles.scoreStatusEmpty}>{item.latest?quizStatusLabel(item.latest.status):"BELUM MENJAWAB"}</span></td>
-   <td>{item.reviewTarget?<button type="button" className={styles.markReviewButton} aria-label={"Semak jawapan "+item.student.full_name} onClick={()=>{setAttemptId(item.reviewTarget!.id);reviewPanelRef.current?.scrollIntoView({behavior:"smooth",block:"start"});}}>SEMAK</button>:<span className={styles.markNoAttempt}>—</span>}</td>
+   <td>{item.reviewTarget?<button type="button" className={styles.markReviewButton} onClick={()=>{setAttemptId(item.reviewTarget!.id);reviewPanelRef.current?.scrollIntoView({behavior:"smooth",block:"start"});}}>SEMAK</button>:<span className={styles.markNoAttempt}>—</span>}</td>
   </tr>)}</tbody>
  </table></div>
  <p className={styles.markCollectionFootnote}>Murid tanpa percubaan turut disenaraikan. Percubaan belum dihantar dan jawapan yang menunggu semakan tidak dikira sebagai markah akhir.</p>
 </section>:<div className={styles.emptyText}>Tiada murid dalam kelas yang ditugaskan kepada akaun ini untuk kuiz berkenaan.</div>}
-{attempts.length===0?<p className={styles.emptyText}>Belum ada percubaan murid.</p>:<div className={styles.reviewLayout} ref={reviewPanelRef} style={{scrollMarginTop:"24px"}}><div className={styles.attemptList}>{attempts.map(a=><button type="button" key={a.id} className={a.id===attemptId?styles.attemptItemActive:styles.attemptItem} onClick={()=>setAttemptId(a.id)}><strong>{a.student?.full_name??"Murid"}</strong><small>{a.student?"T"+a.student.form_level+" · "+a.student.class_name:""} · Percubaan {a.attempt_number}</small><span className={a.status==="graded"?styles.publishedTag:styles.draftTag}>{quizStatusLabel(a.status)}</span><small>{a.total_score}/{a.max_score} markah</small></button>)}</div><div className={styles.responseReview}>{selectedAttempt?<><div className={styles.resultSummary}><strong>{selectedAttempt.student?.full_name??"Murid"}</strong><strong>{selectedAttempt.total_score}/{selectedAttempt.max_score}</strong></div>{selectedAttempt.responses.map((r,i)=><article className={styles.responseCard} key={r.id}><div className={styles.questionMeta}><span>SOALAN {r.question?.question_order??i+1}</span><span>{r.question?.marks??0} markah</span></div><div className={styles.questionSyllabusTag}>{syllabusTopics.find(topic=>topic.id===r.question?.syllabus_topic_id)?.topic_code} · {syllabusTopics.find(topic=>topic.id===r.question?.syllabus_topic_id)?.title??"Subbab tidak ditemui"}</div>{r.question?.image_url?<img className={styles.questionImagePreview} src={r.question.image_url} alt={"Gambar soalan "+(r.question.question_order??i+1)}/>:null}{r.question?.prompt!=="Lihat gambar soalan"?<p>{r.question?.prompt}</p>:null}{r.question?.question_type==="structured"&&r.question?.marking_guide?<div className={styles.responseInfo}>Panduan pemarkahan guru: {r.question.marking_guide}</div>:null}{r.question?.question_type==="objective"?<div className={styles.responseInfo}>Jawapan {r.selected_option?.option_code??"—"}{r.selected_option?.option_text?" · "+r.selected_option.option_text:""} · Markah automatik {r.auto_score??0}</div>:<><div
+{attempts.length===0?<p className={styles.emptyText}>Belum ada percubaan murid.</p>:<div className={styles.reviewLayout} ref={reviewPanelRef} style={{scrollMarginTop:"24px"}}><div className={styles.attemptList}>{attempts.map(a=><button type="button" key={a.id} className={a.id===attemptId?styles.attemptItemActive:styles.attemptItem} onClick={()=>setAttemptId(a.id)}><strong>{a.student?.full_name??"Murid"}</strong><small>{a.student?"T"+a.student.form_level+" · "+a.student.class_name:""} · Percubaan {a.attempt_number}</small><span className={a.status==="graded"?styles.publishedTag:styles.draftTag}>{quizStatusLabel(a.status)}</span><small>{a.total_score}/{a.max_score} markah</small></button>)}</div><div className={styles.responseReview}>{selectedAttempt?<><div className={styles.resultSummary}><strong>{selectedAttempt.student?.full_name??"Murid"}</strong><strong>{selectedAttempt.total_score}/{selectedAttempt.max_score}</strong></div>{selectedAttempt.responses.map((r,i)=><article className={styles.responseCard} key={r.id}><div className={styles.questionMeta}><span>SOALAN {r.question?.question_order??i+1}</span><span>{r.question?.marks??0} markah</span></div><div className={styles.questionSyllabusTag}>{syllabusTopics.find(topic=>topic.id===r.question?.syllabus_topic_id)?.topic_code} · {syllabusTopics.find(topic=>topic.id===r.question?.syllabus_topic_id)?.title??"Subbab tidak ditemui"}</div>{r.question?.image_url?<img className={styles.questionImagePreview} src={r.question.image_url} alt={"Gambar soalan "+(r.question.question_order??i+1)}/>:null}{r.question?.prompt!=="Lihat gambar soalan"?<p>{r.question?.prompt}</p>:null}{r.question?.question_type==="structured"&&(r.question?.marking_guide||r.question?.marking_guide_image_urls?.length)?<div className={styles.responseInfo}><strong>Panduan pemarkahan guru (rahsia)</strong>{r.question.marking_guide?<p>{r.question.marking_guide}</p>:null}{(r.question.marking_guide_image_urls??[]).map((url,index)=><img key={url} className={styles.questionImagePreview} src={url} alt={"Panduan pemarkahan "+(index+1)}/>)}</div>:null}{r.question?.question_type==="objective"?<div className={styles.responseInfo}>Jawapan {r.selected_option?.option_code??"—"}{r.selected_option?.option_text?" · "+r.selected_option.option_text:""} · Markah automatik {r.auto_score??0}</div>:<><div
  ref={node=>{answerRefs.current[r.id]=node;}}
  className={styles.studentAnswer+" "+styles.teacherSelectableAnswer}
  onMouseUp={()=>captureSelection(r.id)}
  onKeyUp={()=>captureSelection(r.id)}
  tabIndex={0}
  aria-label="Pilih perkataan dalam jawapan murid untuk menanda pemarkahan"
->{renderMarkedAnswer(r.response_text||"Tiada jawapan.",annotationDrafts[r.id],false)}</div>
+>{renderMarkedAnswer(r.response_text||"Tiada jawapan bertulis.",annotationDrafts[r.id],false)}</div>{(r.answer_image_urls??[]).map((url,index)=><img key={url} className={styles.questionImagePreview} src={url} alt={"Gambar jawapan murid "+(index+1)}/>)}
  <div className={styles.markingToolbar}>
   <div className={styles.markingToolbarHeading}>
    <strong>Tanda pemarkahan pada jawapan</strong>

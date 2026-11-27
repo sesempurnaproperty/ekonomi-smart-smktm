@@ -206,10 +206,11 @@ async function signQuestionImagePaths(
   const quiz = quizzes[0];
   if (!quiz) return { error: "Kuiz tidak ditemui.", status: 404 };
 
+  let staffAccess: { assignedClassIds?: string[]; error?: string; status?: number; quiz?: JsonRecord } | null = null;
   if (isStaff(profile)) {
-    const access = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
-    if (!access.quiz) {
-      return { error: access.error ?? "Akses imej kuiz ditolak.", status: access.status ?? 403 };
+    staffAccess = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
+    if (!staffAccess.quiz) {
+      return { error: staffAccess.error ?? "Akses imej kuiz ditolak.", status: staffAccess.status ?? 403 };
     }
   } else if (profile.role === "student") {
     const eligibleQuiz = await studentCanTakeQuiz(supabaseUrl, secretKey, quizId, profile);
@@ -227,16 +228,73 @@ async function signQuestionImagePaths(
   }
 
   const questionRows = await getRows(supabaseUrl, secretKey, "quiz_questions", {
-    select: "image_path",
+    select: "id,image_path,image_paths",
     quiz_id: "eq." + quizId,
-    image_path: "in.(" + paths.join(",") + ")",
     limit: "200"
   });
-  const allowedPaths = new Set(questionRows
-    .map((row) => String(row.image_path ?? ""))
-    .filter(Boolean));
+  const allowedPaths = new Set<string>();
+  for (const row of questionRows) {
+    if (typeof row.image_path === "string") allowedPaths.add(row.image_path);
+    if (Array.isArray(row.image_paths)) row.image_paths.forEach((path) => { if (typeof path === "string") allowedPaths.add(path); });
+  }
+  if (isStaff(profile)) {
+    const questionIds = questionRows.map((row) => String(row.id));
+    const guideRows = questionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_answer_keys", { select: "marking_guide_image_paths", question_id: "in.(" + questionIds.join(",") + ")", limit: "500" }) : [];
+    guideRows.forEach((row) => { if (Array.isArray(row.marking_guide_image_paths)) row.marking_guide_image_paths.forEach((path) => { if (typeof path === "string") allowedPaths.add(path); }); });
+
+    const attempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
+      select: "id,student_id",
+      quiz_id: "eq." + quizId,
+      limit: "2000"
+    });
+    let permittedStudentIds = new Set(attempts.map((attempt) => String(attempt.student_id)));
+    if (profile.role === "teacher") {
+      const assignedClassIds = new Set(staffAccess?.assignedClassIds ?? []);
+      const studentIds = [...permittedStudentIds];
+      const students = studentIds.length ? await getRows(supabaseUrl, secretKey, "user_profiles", {
+        select: "user_id,academic_class_id,role",
+        user_id: "in.(" + studentIds.join(",") + ")",
+        limit: "2000"
+      }) : [];
+      permittedStudentIds = new Set(students.filter((student) =>
+        student.role === "student" && assignedClassIds.has(String(student.academic_class_id))
+      ).map((student) => String(student.user_id)));
+    }
+    const permittedAttempts = attempts.filter((attempt) => permittedStudentIds.has(String(attempt.student_id)));
+    const attemptIds = permittedAttempts.map((attempt) => String(attempt.id));
+    const answerRows = attemptIds.length ? await getRows(supabaseUrl, secretKey, "quiz_responses", {
+      select: "answer_image_paths",
+      attempt_id: "in.(" + attemptIds.join(",") + ")",
+      question_id: "in.(" + questionIds.join(",") + ")",
+      limit: "5000"
+    }) : [];
+    answerRows.forEach((row) => {
+      if (Array.isArray(row.answer_image_paths)) row.answer_image_paths.forEach((path) => {
+        if (typeof path === "string") allowedPaths.add(path);
+      });
+    });
+  } else if (profile.role === "student") {
+    const ownAttempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
+      select: "id",
+      quiz_id: "eq." + quizId,
+      student_id: "eq." + callerId,
+      limit: "100"
+    });
+    const ownAttemptIds = ownAttempts.map((attempt) => String(attempt.id));
+    const ownResponses = ownAttemptIds.length ? await getRows(supabaseUrl, secretKey, "quiz_responses", {
+      select: "answer_image_paths",
+      attempt_id: "in.(" + ownAttemptIds.join(",") + ")",
+      question_id: "in.(" + questionRows.map((row) => String(row.id)).join(",") + ")",
+      limit: "500"
+    }) : [];
+    ownResponses.forEach((row) => {
+      if (Array.isArray(row.answer_image_paths)) row.answer_image_paths.forEach((path) => {
+        if (typeof path === "string") allowedPaths.add(path);
+      });
+    });
+  }
   if (paths.some((path) => !allowedPaths.has(path))) {
-    return { error: "Satu atau lebih imej tidak dipautkan kepada kuiz ini.", status: 400 };
+    return { error: "Satu atau lebih imej tidak dipautkan kepada kuiz atau tidak dibenarkan.", status: 403 };
   }
 
   const signedResults = await Promise.all(paths.map(async (path) => {
@@ -472,7 +530,7 @@ async function getQuestionsAndOptions(
   quizId: string
 ) {
   const questions = await getRows(supabaseUrl, secretKey, "quiz_questions", {
-    select: "id,quiz_id,question_order,question_type,prompt,marks,image_path,syllabus_topic_id",
+    select: "id,quiz_id,question_order,question_type,prompt,marks,image_path,image_paths,syllabus_topic_id",
     quiz_id: "eq." + quizId,
     order: "question_order.asc",
     limit: "200"
@@ -810,7 +868,7 @@ async function startAttempt(
   }
 
   const draftResponses = await getRows(supabaseUrl, secretKey, "quiz_responses", {
-    select: "question_id,selected_option_id,response_text",
+    select: "question_id,selected_option_id,response_text,answer_image_paths",
     attempt_id: "eq." + String(attempt.id),
     limit: "500"
   });
@@ -839,7 +897,8 @@ async function saveDraftResponse(
   questionId: string,
   userId: string,
   selectedOptionId: string | null,
-  responseText: string | null
+  responseText: string | null,
+  answerImagePathsValue: unknown = []
 ) {
   const attempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", {
     select: "id,quiz_id,status",
@@ -860,6 +919,9 @@ async function saveDraftResponse(
   const question = questions[0];
   if (!question) return { error: "Soalan tidak sepadan dengan percubaan ini.", status: 400 };
 
+  const answerImagePaths = Array.isArray(answerImagePathsValue) ? [...new Set(answerImagePathsValue.filter((path): path is string => typeof path === "string" && path.startsWith(String(attempt.quiz_id) + "/answers/" + attemptId + "/" + questionId + "/")))] : [];
+  if (answerImagePaths.length > 4) return { error: "Maksimum empat gambar jawapan dibenarkan.", status: 400 };
+  if (question.question_type === "objective" && answerImagePaths.length) return { error: "Gambar jawapan hanya dibenarkan untuk soalan struktur.", status: 400 };
   if (question.question_type === "objective") {
     if (selectedOptionId) {
       const options = await getRows(supabaseUrl, secretKey, "quiz_options", {
@@ -881,6 +943,7 @@ async function saveDraftResponse(
     question_id: questionId,
     selected_option_id: selectedOptionId,
     response_text: responseText,
+    answer_image_paths: answerImagePaths,
     auto_score: null,
     teacher_score: null
   }], "attempt_id,question_id");
@@ -944,11 +1007,14 @@ async function submitAttempt(
     } else {
       structuredCount += 1;
       const responseText = typeof answer.response_text === "string" ? answer.response_text.trim().slice(0, 12000) : "";
+      const answerImagePaths = Array.isArray(answer.answer_image_paths) ? [...new Set(answer.answer_image_paths.filter((path): path is string => typeof path === "string" && path.startsWith(String(attempt.quiz_id) + "/answers/" + attemptId + "/" + qid + "/")))] : [];
+      if (answerImagePaths.length > 4) return { error: "Maksimum empat gambar jawapan dibenarkan.", status: 400 };
       responses.push({
         attempt_id: attemptId,
         question_id: qid,
         selected_option_id: null,
         response_text: responseText,
+        answer_image_paths: answerImagePaths,
         auto_score: null,
         teacher_score: null
       });
@@ -989,8 +1055,22 @@ async function uploadQuizQuestionImage(
   callerId: string,
   input: JsonRecord
 ) {
-  const access = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
-  if (!access.quiz) return { error: access.error ?? "Akses kuiz ditolak.", status: access.status ?? 403 };
+  const category = input.category === "answer" || input.category === "guide" ? input.category : "question";
+  let storagePrefix = "";
+  if (category === "answer") {
+    if (profile.role !== "student" || typeof input.attempt_id !== "string" || typeof input.question_id !== "string") return { error: "Akses muat naik jawapan ditolak.", status: 403 };
+    const ownedAttempts = await getRows(supabaseUrl, secretKey, "quiz_attempts", { select: "id,quiz_id,status", id: "eq." + input.attempt_id, quiz_id: "eq." + quizId, student_id: "eq." + callerId, status: "eq.in_progress", limit: "1" });
+    if (!ownedAttempts.length) return { error: "Percubaan aktif tidak ditemui.", status: 403 };
+    const targetQuestions = await getRows(supabaseUrl, secretKey, "quiz_questions", { select: "id,question_type", id: "eq." + input.question_id, quiz_id: "eq." + quizId, limit: "1" });
+    if (!targetQuestions.length || targetQuestions[0].question_type !== "structured") return { error: "Gambar jawapan hanya dibenarkan untuk soalan struktur.", status: 400 };
+    const existing = await getRows(supabaseUrl, secretKey, "quiz_responses", { select: "answer_image_paths", attempt_id: "eq." + input.attempt_id, question_id: "eq." + input.question_id, limit: "1" });
+    if ((existing[0]?.answer_image_paths ?? []).length >= 4) return { error: "Maksimum empat gambar jawapan dibenarkan.", status: 409 };
+    storagePrefix = "answers/" + input.attempt_id + "/" + input.question_id + "/";
+  } else {
+    const access = await getManageableQuiz(supabaseUrl, secretKey, quizId, profile, callerId);
+    if (!access.quiz) return { error: access.error ?? "Akses kuiz ditolak.", status: access.status ?? 403 };
+    storagePrefix = category === "guide" ? "guide/" : "";
+  }
 
   const mimeType = typeof input.mime_type === "string" ? input.mime_type : "";
   const extensionByType: Record<string, string> = {
@@ -1002,8 +1082,8 @@ async function uploadQuizQuestionImage(
   if (!extension) return { error: "Format gambar tidak disokong. Gunakan JPG, PNG atau WebP.", status: 400 };
 
   const encoded = typeof input.image_base64 === "string" ? input.image_base64 : "";
-  if (!encoded || encoded.length > 7_100_000) {
-    return { error: "Saiz gambar terlalu besar. Had maksimum ialah 5 MB.", status: 413 };
+  if (!encoded || encoded.length > 5_600_000) {
+    return { error: "Saiz gambar terlalu besar. Had maksimum ialah 4 MB.", status: 413 };
   }
 
   let bytes: Uint8Array;
@@ -1014,11 +1094,11 @@ async function uploadQuizQuestionImage(
   } catch {
     return { error: "Data gambar tidak sah.", status: 400 };
   }
-  if (!bytes.length || bytes.length > 5 * 1024 * 1024) {
-    return { error: "Saiz gambar mesti antara 1 bait hingga 5 MB.", status: 413 };
+  if (!bytes.length || bytes.length > 4 * 1024 * 1024) {
+    return { error: "Saiz gambar mesti antara 1 bait hingga 4 MB.", status: 413 };
   }
 
-  const path = quizId + "/" + crypto.randomUUID() + "." + extension;
+  const path = quizId + "/" + storagePrefix + crypto.randomUUID() + "." + extension;
   const uploadUrl = new URL(
     "/storage/v1/object/quiz-question-images/" + path.split("/").map(encodeURIComponent).join("/"),
     supabaseUrl
@@ -1056,16 +1136,23 @@ async function createQuizQuestion(
     ? input.question_type
     : null;
   const prompt = typeof input.prompt === "string" ? input.prompt.trim().slice(0, 12000) : "";
-  const imagePath = typeof input.image_path === "string" && input.image_path.length > 0
-    ? input.image_path
-    : null;
+  const rawImagePaths = Array.isArray(input.image_paths) ? input.image_paths : (typeof input.image_path === "string" && input.image_path ? [input.image_path] : []);
+  const imagePaths = [...new Set(rawImagePaths.filter((path): path is string => typeof path === "string" && path.length > 0))];
+  const imagePath = imagePaths[0] ?? null;
+  const rawGuidePaths = Array.isArray(input.marking_guide_image_paths) ? input.marking_guide_image_paths : [];
+  const guideImagePaths = [...new Set(rawGuidePaths.filter((path): path is string => typeof path === "string" && path.length > 0))];
   const marks = Number(input.marks);
   const topicId = typeof input.syllabus_topic_id === "string" ? input.syllabus_topic_id : "";
   if (!questionType) return { error: "Jenis soalan tidak sah.", status: 400 };
-  if (!prompt && !imagePath) return { error: "Masukkan teks soalan atau lampirkan gambar soalan.", status: 400 };
+  if (!prompt && !imagePaths.length) return { error: "Masukkan teks soalan atau lampirkan gambar soalan.", status: 400 };
+  if (imagePaths.length > 4 || guideImagePaths.length > 4) return { error: "Maksimum empat gambar dibenarkan bagi setiap bahagian.", status: 400 };
+  if (imagePaths.some((path) => !path.startsWith(quizId + "/") || path.startsWith(quizId + "/guide/") || path.startsWith(quizId + "/answers/"))) return { error: "Laluan gambar soalan tidak sah.", status: 400 };
+  if (guideImagePaths.some((path) => !path.startsWith(quizId + "/guide/"))) return { error: "Laluan gambar panduan pemarkahan tidak sah.", status: 400 };
+  if (questionType !== "structured" && guideImagePaths.length) return { error: "Panduan pemarkahan hanya dibenarkan untuk soalan struktur.", status: 400 };
+  if (imagePaths.length > 0 && imagePaths.reduce((sum, path) => sum + path.length, 0) > 2000) return { error: "Jumlah data gambar soalan terlalu besar.", status: 413 };
   if (!Number.isFinite(marks) || marks < 0.5 || marks > 1000) return { error: "Markah soalan tidak sah.", status: 400 };
   if (!topicId) return { error: "Pilih bab kecil atau subbab silibus.", status: 400 };
-  if (imagePath && !imagePath.startsWith(quizId + "/")) return { error: "Laluan gambar soalan tidak sah.", status: 400 };
+  // Laluan imej disahkan di atas dan mesti berada dalam folder kuiz ini.
 
   const topics = await getRows(supabaseUrl, secretKey, "syllabus_topics", {
     select: "id,chapter_id",
@@ -1090,7 +1177,7 @@ async function createQuizQuestion(
   const optionCodes = ["A", "B", "C", "D"];
   if (questionType === "objective") {
     if (optionValues.length !== 4) return { error: "Soalan objektif memerlukan empat pilihan jawapan.", status: 400 };
-    if (!imagePath && optionValues.some((value) => typeof value !== "string" || !value.trim())) {
+    if (!imagePaths.length && optionValues.some((value) => typeof value !== "string" || !value.trim())) {
       return { error: "Lengkapkan pilihan A, B, C dan D, atau gunakan gambar yang mengandungi pilihan jawapan.", status: 400 };
     }
     if (typeof input.correct_option_code !== "string" || !optionCodes.includes(input.correct_option_code)) {
@@ -1105,6 +1192,7 @@ async function createQuizQuestion(
     prompt: prompt || "Lihat gambar soalan",
     marks,
     image_path: imagePath,
+    image_paths: imagePaths,
     syllabus_topic_id: topicId
   }]);
   const question = created[0];
@@ -1128,6 +1216,7 @@ async function createQuizQuestion(
       question_id: String(question.id),
       correct_option_id: correctOptionId,
       marking_guide: questionType === "structured" && typeof input.marking_guide === "string" ? input.marking_guide.trim() : null,
+      marking_guide_image_paths: questionType === "structured" ? guideImagePaths : [],
       updated_by: callerId,
       updated_at: new Date().toISOString()
     }], "question_id");
@@ -1562,7 +1651,8 @@ Deno.serve(async (req: Request) => {
       result = await saveDraftResponse(
         supabaseUrl, secretKey, body.attempt_id, body.question_id, callerId,
         typeof body.selected_option_id === "string" ? body.selected_option_id : null,
-        typeof body.response_text === "string" ? body.response_text : null
+        typeof body.response_text === "string" ? body.response_text : null,
+        body.answer_image_paths
       );
     } else if (action === "submit_attempt") {
       if (profile.role !== "student") return send({ error: "Tindakan ini khusus untuk murid." }, 403, origin);
@@ -1652,18 +1742,18 @@ Deno.serve(async (req: Request) => {
       }
       const attemptIds = visibleAttemptRows.map((a) => String(a.id));
       const responseRows = attemptIds.length ? await getRows(supabaseUrl, secretKey, "quiz_responses", {
-        select: "id,attempt_id,question_id,selected_option_id,response_text,auto_score,teacher_score,feedback,marking_annotations",
+        select: "id,attempt_id,question_id,selected_option_id,response_text,answer_image_paths,auto_score,teacher_score,feedback,marking_annotations",
         attempt_id: "in.(" + attemptIds.join(",") + ")",
         limit: "2000"
       }) : [];
       const questionIds = [...new Set(responseRows.map((r) => String(r.question_id)))];
       const questionRows = questionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_questions", {
-        select: "id,question_type,prompt,marks,question_order,image_path,syllabus_topic_id",
+        select: "id,question_type,prompt,marks,question_order,image_path,image_paths,syllabus_topic_id",
         id: "in.(" + questionIds.join(",") + ")",
         limit: "1000"
       }) : [];
       const answerKeyRows = questionIds.length ? await getRows(supabaseUrl, secretKey, "quiz_answer_keys", {
-        select: "question_id,marking_guide",
+        select: "question_id,marking_guide,marking_guide_image_paths",
         question_id: "in.(" + questionIds.join(",") + ")",
         limit: "1000"
       }) : [];
@@ -1676,7 +1766,8 @@ Deno.serve(async (req: Request) => {
       }) : [];
       const questionMap = new Map(questionRows.map((q) => [String(q.id), {
         ...q,
-        marking_guide: guideMap.get(String(q.id)) ?? null
+        marking_guide: guideMap.get(String(q.id)) ?? null,
+        marking_guide_image_paths: answerKeyRows.find((row) => String(row.question_id) === String(q.id))?.marking_guide_image_paths ?? []
       }]));
       const optionMap = new Map(optionRows.map((o) => [String(o.id), o]));
       result = {
