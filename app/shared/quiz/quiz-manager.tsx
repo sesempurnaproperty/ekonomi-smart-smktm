@@ -66,7 +66,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
  const [annotationDrafts,setAnnotationDrafts]=useState<Record<string,MarkAnnotation[]>>({});
  const [selectedRanges,setSelectedRanges]=useState<Record<string,{start:number;end:number;text:string}>>({});
  const answerRefs=useRef<Record<string,HTMLDivElement|null>>({});
- const imageInputRef=useRef<HTMLInputElement|null>(null);\n const guideImageInputRef=useRef<HTMLInputElement|null>(null);
+ const imageInputRef=useRef<HTMLInputElement|null>(null);
+ const guideImageInputRef=useRef<HTMLInputElement|null>(null);
  const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [notice,setNotice]=useState("");
  const refresh=useCallback(async()=>{
   setLoading(true);
@@ -109,7 +110,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   const qs=(q.data??[]) as Question[];
   const arsRaw=(a.data?.attempts??[]) as A[];
   const imagePaths=[...new Set([
-   ...qs.flatMap(item=>[item.image_path,...(item.image_paths??[])]),\n   ...arsRaw.flatMap(attempt=>attempt.responses.flatMap(response=>(response.question?.marking_guide_image_paths??[]))),
+   ...qs.flatMap(item=>[item.image_path,...(item.image_paths??[])]),
+   ...arsRaw.flatMap(attempt=>attempt.responses.flatMap(response=>(response.question?.marking_guide_image_paths??[]))),
    ...arsRaw.flatMap(attempt=>attempt.responses.flatMap(response=>[response.question?.image_path??null,...(response.question?.image_paths??[]),...(response.answer_image_paths??[])]))
   ].filter((path):path is string=>typeof path==="string"&&path.length>0))];
   const signedResult=imagePaths.length
@@ -123,7 +125,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   const withImage=(question:Question):Question=>({
    ...question,
    image_url:question.image_path?signedMap.get(question.image_path)??null:null,
-   image_urls:(question.image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url)),\n   marking_guide_image_urls:(question.marking_guide_image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url))
+   image_urls:(question.image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url)),
+   marking_guide_image_urls:(question.marking_guide_image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url))
   });
   setQuestions(qs.map(withImage));
   const ids=new Set(qs.map(question=>question.id));
@@ -135,7 +138,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     question:response.question?{
      ...response.question,
      image_url:response.question.image_path?signedMap.get(response.question.image_path)??null:null,
-     image_urls:(response.question.image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url)),\n     marking_guide_image_urls:(response.question.marking_guide_image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url))
+     image_urls:(response.question.image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url)),
+     marking_guide_image_urls:(response.question.marking_guide_image_paths??[]).map(path=>signedMap.get(path)).filter((url):url is string=>Boolean(url))
     }:null
    }))
   }));
@@ -320,7 +324,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
   }
   setBusy(true);setError("");setNotice("");
   let imagePath:string|null=null;
-  const imagePaths:string[]=[];\n  const guideImagePaths:string[]=[];
+  const imagePaths:string[]=[];
+  const guideImagePaths:string[]=[];
   let createdQuestionId:string|null=null;
   try{
    if(form.imageItems.length>4||form.imageItems.reduce((sum,item)=>sum+item.size,0)>16*1024*1024||form.guideItems.length>4||form.guideItems.reduce((sum,item)=>sum+item.size,0)>16*1024*1024)throw new Error("Had maksimum empat gambar dan 16 MB bagi setiap bahagian.");
@@ -351,7 +356,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
     syllabus_topic_id:form.syllabusTopicId,
     options:form.kind==="objective"?form.options.map(value=>value.trim()):[],
     correct_option_code:form.kind==="objective"?form.correct:null,
-    marking_guide:form.kind==="structured"?form.guide.trim():null,\n    marking_guide_image_paths:form.kind==="structured"?guideImagePaths:[]
+    marking_guide:form.kind==="structured"?form.guide.trim():null,
+    marking_guide_image_paths:form.kind==="structured"?guideImagePaths:[]
    }});
    if(createError||created?.error)throw new Error("Penyimpanan soalan gagal: "+(createError?.message??created?.error??"Ralat tidak diketahui."));
    createdQuestionId=created.question?.id??null;
@@ -381,7 +387,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    "RESET PERCOBAAN KUIZ?",
    "",
    "Tindakan ini akan memadam "+scopeText+", termasuk jawapan, markah dan ulasan guru. Kuiz akan ditarik balik dan perlu diterbitkan semula. Tindakan ini tidak boleh dibatalkan. Teruskan?"
-  ].join("\n"));
+  ].join("
+"));
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"reset_quiz_attempts",quiz_id:selected.id}});
@@ -398,7 +405,8 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
    "PADAM KESELURUHAN KUIZ?",
    "",
    "Kuiz '"+selected.title+"' akan dipadam bersama semua soalan, pilihan jawapan, kunci jawapan, jawapan murid, markah dan sejarah percubaan yang berkaitan. Tindakan ini kekal dan tidak boleh dibatalkan. Teruskan?"
-  ].join("\n"));
+  ].join("
+"));
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
   const {data,error:err}=await s.functions.invoke("quiz-engine",{body:{action:"delete_quiz",quiz_id:selected.id}});
@@ -411,7 +419,9 @@ export default function QuizManager({dashboardHref,roleLabel}:{dashboardHref:str
 
  async function removeQuestion(question:Question){
   const ok=window.confirm(
-   "PADAM SOALAN "+question.question_order+"?\n\nSoalan ini serta pilihan jawapan dan kunci jawapannya akan dipadam. Kuiz mesti berstatus draf. Semua percubaan murid yang berkaitan perlu direset terlebih dahulu supaya rekod jawapan dan markah tidak terjejas secara senyap. Jika masih ada percubaan, sistem akan memaklumkan sebab sebenar dan jumlah yang masih berbaki. Teruskan?"
+   "PADAM SOALAN "+question.question_order+"?
+
+Soalan ini serta pilihan jawapan dan kunci jawapannya akan dipadam. Kuiz mesti berstatus draf. Semua percubaan murid yang berkaitan perlu direset terlebih dahulu supaya rekod jawapan dan markah tidak terjejas secara senyap. Jika masih ada percubaan, sistem akan memaklumkan sebab sebenar dan jumlah yang masih berbaki. Teruskan?"
   );
   if(!ok)return;
   setBusy(true);setError("");setNotice("");
