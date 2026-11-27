@@ -14,7 +14,8 @@ type Quiz = {
   attempt_limit: number;
   status: string;
 };
-type AnswerImage={type:string;size:number;base64:string;preview:string;path?:string};\ntype MarkType = "right" | "wrong" | "tr" | "repeat";
+type AnswerImage={type:string;size:number;base64:string;preview:string;path?:string};
+type MarkType = "right" | "wrong" | "tr" | "repeat";
 type MarkAnnotation = { id:string; start:number; end:number; text:string; type:MarkType; comment?:string };
 type SyllabusTopicInfo={
   id:string;topic_code:string;title:string;chapter_number:number;chapter_title:string;
