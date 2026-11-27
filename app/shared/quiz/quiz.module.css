@@ -487,8 +487,11 @@
 /* Inline teacher marking toolbar */
 .teacherSelectableAnswer {
   user-select:text;
+  -webkit-user-select:text;
+  -webkit-touch-callout:default;
   cursor:text;
   line-height:1.9;
+  touch-action:pan-y;
 }
 .annotationRight,.annotationWrong,.annotationTR,.annotationRepeat {
   padding:1px 2px;
