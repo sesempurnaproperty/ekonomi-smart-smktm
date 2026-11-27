@@ -245,7 +245,10 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
       return;
     }
     const view = data as Active;
-    const imagePaths = [...new Set(view.questions.map(question=>question.image_path).filter((path):path is string=>typeof path==="string"&&path.length>0))];
+    const imagePaths = [...new Set([
+      ...view.questions.map(question=>question.image_path),
+      ...(view.draft_responses ?? []).flatMap(row=>row.answer_image_paths ?? [])
+    ].filter((path):path is string=>typeof path==="string"&&path.length>0))];
     const signResult=imagePaths.length
       ? await supabase.functions.invoke("quiz-engine",{body:{action:"sign_question_images",quiz_id:quiz.id,image_paths:imagePaths}})
       : {data:{image_urls:[]},error:null};
@@ -263,11 +266,20 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
       }))
     };
     setActive(viewWithImages);
-    const draft: Record<string, { selected_option_id?: string; response_text?: string }> = {};
+    const draft: Record<string, { selected_option_id?: string; response_text?: string; answer_image_paths?: string[]; answer_images?: AnswerImage[] }> = {};
     (view.draft_responses ?? []).forEach((row) => {
+      const paths = row.answer_image_paths ?? [];
       draft[row.question_id] = {
         selected_option_id: row.selected_option_id ?? undefined,
-        response_text: row.response_text ?? undefined
+        response_text: row.response_text ?? undefined,
+        answer_image_paths: paths,
+        answer_images: paths.map(path => ({
+          type: "image/jpeg",
+          size: 0,
+          base64: "",
+          preview: signedMap.get(path) ?? "",
+          path
+        }))
       };
     });
     setAnswers(draft);
