@@ -275,17 +275,26 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
 
   async function saveDraft(questionId: string, selectedOptionId: string | null, responseText: string | null) {
     if (!active) return;
-    const { data, error: invokeError } = await supabase.functions.invoke("quiz-engine", {
-      body: {
-        action: "save_draft_response",
-        attempt_id: active.attempt.id,
-        question_id: questionId,
-        selected_option_id: selectedOptionId,
-        response_text: responseText
+    try {
+      const question = active.questions.find((item) => item.id === questionId);
+      const answerImagePaths = question?.question_type === "structured"
+        ? await uploadAnswerImages(questionId)
+        : [];
+      const { data, error: invokeError } = await supabase.functions.invoke("quiz-engine", {
+        body: {
+          action: "save_draft_response",
+          attempt_id: active.attempt.id,
+          question_id: questionId,
+          selected_option_id: selectedOptionId,
+          response_text: responseText,
+          answer_image_paths: answerImagePaths
+        }
+      });
+      if (invokeError || data?.error) {
+        setError(invokeError?.message ?? data?.error ?? "Jawapan sementara gagal disimpan.");
       }
-    });
-    if (invokeError || data?.error) {
-      setError(invokeError?.message ?? data?.error ?? "Jawapan sementara gagal disimpan.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gambar jawapan gagal disimpan.");
     }
   }
 
@@ -350,11 +359,25 @@ export default function StudentQuizZone({ formLevel, className }: { formLevel: n
 
     setBusy(true);
     setError("");
-    const payload = active.questions.map((question) => ({
-      question_id: question.id,
-      selected_option_id: answers[question.id]?.selected_option_id ?? null,
-      response_text: answers[question.id]?.response_text ?? ""
-    }));
+    let payload: { question_id: string; selected_option_id: string | null; response_text: string; answer_image_paths?: string[] }[];
+    try {
+      payload = [];
+      for (const question of active.questions) {
+        const answerImagePaths = question.question_type === "structured"
+          ? await uploadAnswerImages(question.id)
+          : [];
+        payload.push({
+          question_id: question.id,
+          selected_option_id: answers[question.id]?.selected_option_id ?? null,
+          response_text: answers[question.id]?.response_text ?? "",
+          ...(question.question_type === "structured" ? { answer_image_paths: answerImagePaths } : {})
+        });
+      }
+    } catch (err) {
+      setBusy(false);
+      setError(err instanceof Error ? err.message : "Gambar jawapan gagal dimuat naik.");
+      return;
+    }
     const { data, error: invokeError } = await supabase.functions.invoke("quiz-engine", {
       body: { action: "submit_attempt", attempt_id: active.attempt.id, answers: payload }
     });
