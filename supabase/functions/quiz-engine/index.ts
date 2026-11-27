@@ -1002,8 +1002,8 @@ async function uploadQuizQuestionImage(
   if (!extension) return { error: "Format gambar tidak disokong. Gunakan JPG, PNG atau WebP.", status: 400 };
 
   const encoded = typeof input.image_base64 === "string" ? input.image_base64 : "";
-  if (!encoded || encoded.length > 7_100_000) {
-    return { error: "Saiz gambar terlalu besar. Had maksimum ialah 5 MB.", status: 413 };
+  if (!encoded || encoded.length > 5_600_000) {
+    return { error: "Saiz gambar terlalu besar. Had maksimum ialah 4 MB.", status: 413 };
   }
 
   let bytes: Uint8Array;
@@ -1014,8 +1014,8 @@ async function uploadQuizQuestionImage(
   } catch {
     return { error: "Data gambar tidak sah.", status: 400 };
   }
-  if (!bytes.length || bytes.length > 5 * 1024 * 1024) {
-    return { error: "Saiz gambar mesti antara 1 bait hingga 5 MB.", status: 413 };
+  if (!bytes.length || bytes.length > 4 * 1024 * 1024) {
+    return { error: "Saiz gambar mesti antara 1 bait hingga 4 MB.", status: 413 };
   }
 
   const path = quizId + "/" + crypto.randomUUID() + "." + extension;
